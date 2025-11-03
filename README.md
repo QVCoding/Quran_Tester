@@ -1,6 +1,8 @@
 # Quran Tester
 HTML-based Quran (Hifdh) testing apps.
 
+Are made public on [https://qurantester.neocities.org](https://qurantester.neocities.org)
+
 # Files
 All Quranic data is taken from [tanzil.org](https://tanzil.net/docs/).
 
