@@ -1,2 +1,13 @@
-# Quran_Tester
-HTML-based Quran (Hifdh) testing apps
+# Quran Tester
+HTML-based Quran (Hifdh) testing apps.
+
+# Files
+All Quranic data is taken from [tanzil.org](https://tanzil.net/docs/).
+
+`app_quran_metadata.xml` Quranic metadata taken from [https://tanzil.net/docs/quran_metadata](https://tanzil.net/docs/quran_metadata), modified to include only surah, juz, and page.
+
+`quran_words.csv` List of every word in the Quran. 
+
+How to produce:
+From [https://tanzil.net/download/](https://tanzil.net/download/) download the `Simple (Plain)` SQL text, with all options disabled.
+Run `make_quran_words.py`, then convert the resulting file to csv.
