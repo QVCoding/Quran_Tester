@@ -511,8 +511,8 @@
             const text = await response.text();
             const lines = text.trim().split('\n');
             
-            // Skip header
-            for (let i = 1; i < lines.length; i++) {
+            // No header - start from first line
+            for (let i = 0; i < lines.length; i++) {
                 const parts = lines[i].split(',');
                 if (parts.length >= 5) {
                     quranWords.push({
