@@ -460,6 +460,15 @@
                 </div>
 
                 <div class="checkbox-group">
+                    <input type="checkbox" id="start-of-ayah">
+                    <label for="start-of-ayah">Keep phrases at the beginning of an ayah</label>
+                    <span class="info-icon" onclick="toggleStartAyahTooltip(event)">i</span>
+                    <div id="start-ayah-tooltip" class="info-tooltip">
+                        If selected, the question will always be from the beginning of an ayah. If deselected, the question can be from anywhere within an ayah.
+                    </div>
+                </div>
+
+                <div class="checkbox-group">
                     <input type="checkbox" id="show-ayah-marker">
                     <label for="show-ayah-marker">Show ayah marker</label>
                     <span class="info-icon" onclick="toggleAyahMarkerTooltip(event)">i</span>
@@ -485,7 +494,10 @@
                 <div id="phrase-display" class="phrase-display"></div>
                 
                 <div class="button-group">
-                    <button id="show-more-btn" onclick="showMoreWord()">Reveal One More Word</button>
+                    <button id="show-more-btn" onclick="showMoreWord()">Reveal Next Word</button>
+                    <button id="show-previous-btn" onclick="showPreviousWord()">Reveal Previous Word</button>
+                </div>
+                <div class="button-group" style="margin-top: 10px;">
                     <button id="reveal-btn" onclick="revealAnswer()">Reveal Answer</button>
                     <button id="next-question-btn" onclick="startNewQuestion()" style="display: none;">New Question</button>
                 </div>
@@ -687,9 +699,11 @@
                         const verseTooltip = document.getElementById('verse-tooltip');
                         const uniqueTooltip = document.getElementById('unique-tooltip');
                         const ayahMarkerTooltip = document.getElementById('ayah-marker-tooltip');
+                        const startAyahTooltip = document.getElementById('start-ayah-tooltip');
                         if (verseTooltip) verseTooltip.classList.remove('show');
                         if (uniqueTooltip) uniqueTooltip.classList.remove('show');
                         if (ayahMarkerTooltip) ayahMarkerTooltip.classList.remove('show');
+                        if (startAyahTooltip) startAyahTooltip.classList.remove('show');
                     }
                 });
             } catch (error) {
@@ -911,19 +925,31 @@
             }
 
             const singleVerseOnly = document.getElementById('single-verse-only').checked;
+            const startOfAyah = document.getElementById('start-of-ayah').checked;
             const uniqueInQuran = document.getElementById('unique-in-quran') ? 
                                   document.getElementById('unique-in-quran').checked : true;
             
             // Determine which word list to check uniqueness against
             const checkAgainst = uniqueInQuran ? quranWords : filteredWords;
             
+            // Filter to only words at the start of ayah if option is selected
+            let wordsToSearchFrom = filteredWords;
+            if (startOfAyah) {
+                wordsToSearchFrom = filteredWords.filter(word => word.wordInAya === 1);
+                if (wordsToSearchFrom.length === 0) {
+                    errorDiv.textContent = 'No words at the beginning of ayahs available with current filter settings.';
+                    errorDiv.style.display = 'block';
+                    return;
+                }
+            }
+            
             let uniquePhrase = null;
             let attempts = 0;
             const maxAttempts = 100;
 
             while (!uniquePhrase && attempts < maxAttempts) {
-                const randomIndex = Math.floor(Math.random() * filteredWords.length);
-                uniquePhrase = findUniquePhraseFromIndex(randomIndex, filteredWords, singleVerseOnly, checkAgainst);
+                const randomIndex = Math.floor(Math.random() * wordsToSearchFrom.length);
+                uniquePhrase = findUniquePhraseFromIndex(randomIndex, wordsToSearchFrom, singleVerseOnly, checkAgainst);
                 attempts++;
             }
 
@@ -935,7 +961,8 @@
 
             currentQuestion = {
                 uniquePhrase: uniquePhrase,
-                filteredWords: filteredWords
+                filteredWords: filteredWords,
+                wordsToSearchFrom: wordsToSearchFrom // Store which array was used
             };
 
             displayedWords = uniquePhrase.words.slice();
@@ -951,6 +978,15 @@
             document.getElementById('answer-display').style.display = 'none';
             document.getElementById('show-more-btn').style.display = 'inline-block';
             document.getElementById('show-more-btn').disabled = false;
+            document.getElementById('show-previous-btn').style.display = 'inline-block';
+            
+            // Check if we're at the beginning of filteredWords and disable previous button if so
+            const firstDisplayedWord = displayedWords[0];
+            const firstIndexInFiltered = filteredWords.findIndex(w => 
+                w.globalWordNumber === firstDisplayedWord.globalWordNumber
+            );
+            document.getElementById('show-previous-btn').disabled = (firstIndexInFiltered === 0);
+            
             document.getElementById('reveal-btn').style.display = 'inline-block';
             document.getElementById('reveal-btn').disabled = false;
             document.getElementById('next-question-btn').style.display = 'none';
@@ -988,6 +1024,13 @@
             tooltip.classList.toggle('show');
         }
 
+        // Toggle start ayah tooltip visibility
+        function toggleStartAyahTooltip(event) {
+            event.stopPropagation();
+            const tooltip = document.getElementById('start-ayah-tooltip');
+            tooltip.classList.toggle('show');
+        }
+
         // Display the current phrase
         function displayPhrase() {
             const phraseDiv = document.getElementById('phrase-display');
@@ -1022,12 +1065,35 @@
         function showMoreWord() {
             if (!currentQuestion) return;
 
-            const nextIndex = currentQuestion.uniquePhrase.startIndex + displayedWords.length;
-            if (nextIndex < currentQuestion.filteredWords.length) {
-                displayedWords.push(currentQuestion.filteredWords[nextIndex]);
+            // Find the last displayed word's position in filteredWords
+            const lastDisplayedWord = displayedWords[displayedWords.length - 1];
+            const lastIndexInFiltered = currentQuestion.filteredWords.findIndex(w => 
+                w.globalWordNumber === lastDisplayedWord.globalWordNumber
+            );
+            
+            if (lastIndexInFiltered >= 0 && lastIndexInFiltered + 1 < currentQuestion.filteredWords.length) {
+                displayedWords.push(currentQuestion.filteredWords[lastIndexInFiltered + 1]);
                 displayPhrase();
             } else {
                 document.getElementById('show-more-btn').disabled = true;
+            }
+        }
+
+        // Show previous word
+        function showPreviousWord() {
+            if (!currentQuestion) return;
+
+            // Find the first displayed word's position in filteredWords
+            const firstDisplayedWord = displayedWords[0];
+            const firstIndexInFiltered = currentQuestion.filteredWords.findIndex(w => 
+                w.globalWordNumber === firstDisplayedWord.globalWordNumber
+            );
+            
+            if (firstIndexInFiltered > 0) {
+                displayedWords.unshift(currentQuestion.filteredWords[firstIndexInFiltered - 1]);
+                displayPhrase();
+            } else {
+                document.getElementById('show-previous-btn').disabled = true;
             }
         }
 
@@ -1064,11 +1130,27 @@
             const juz = findJuzForWord(firstWord);
             const page = findPageForWord(firstWord);
 
+            // Handle ayah display - check if cross-surah
+            let ayahDisplay;
+            if (verses.size > 1) {
+                if (firstWord.sura !== lastWord.sura) {
+                    // Cross-surah: show both locations
+                    const lastSurahName = metadata.suras.find(s => s.index === lastWord.sura).name;
+                    ayahDisplay = `${surahName} ${firstWord.aya} - ${lastSurahName} ${lastWord.aya}`;
+                } else {
+                    // Same surah, multiple ayahs
+                    ayahDisplay = `${firstWord.aya} - ${lastWord.aya}`;
+                }
+            } else {
+                // Single ayah
+                ayahDisplay = `${firstWord.aya}`;
+            }
+
             const metadataDiv = document.createElement('div');
             metadataDiv.className = 'answer-metadata';
             metadataDiv.innerHTML = `
                 <div><strong>Surah:</strong> ${surahName} (${firstWord.sura})</div>
-                <div><strong>Ayah:</strong> ${firstWord.aya}${verses.size > 1 ? ` - ${lastWord.aya}` : ''}</div>
+                <div><strong>Ayah:</strong> ${ayahDisplay}</div>
                 <div><strong>Juz:</strong> ${juz}</div>
                 <div><strong>Page:</strong> ${page}</div>
             `;
@@ -1106,6 +1188,7 @@
 
             answerDiv.style.display = 'block';
             document.getElementById('show-more-btn').style.display = 'none';
+            document.getElementById('show-previous-btn').style.display = 'none';
             document.getElementById('reveal-btn').style.display = 'none';
             document.getElementById('next-question-btn').style.display = 'inline-block';
             document.getElementById('new-question-btn').style.display = 'none';
