@@ -460,6 +460,15 @@
                 </div>
 
                 <div class="checkbox-group">
+                    <input type="checkbox" id="start-of-ayah">
+                    <label for="start-of-ayah">Keep phrases at the beginning of an ayah</label>
+                    <span class="info-icon" onclick="toggleStartAyahTooltip(event)">i</span>
+                    <div id="start-ayah-tooltip" class="info-tooltip">
+                        If selected, the question will always be from the beginning of an ayah. If deselected, the question can be from anywhere within an ayah.
+                    </div>
+                </div>
+
+                <div class="checkbox-group">
                     <input type="checkbox" id="show-ayah-marker">
                     <label for="show-ayah-marker">Show ayah marker</label>
                     <span class="info-icon" onclick="toggleAyahMarkerTooltip(event)">i</span>
@@ -687,9 +696,11 @@
                         const verseTooltip = document.getElementById('verse-tooltip');
                         const uniqueTooltip = document.getElementById('unique-tooltip');
                         const ayahMarkerTooltip = document.getElementById('ayah-marker-tooltip');
+                        const startAyahTooltip = document.getElementById('start-ayah-tooltip');
                         if (verseTooltip) verseTooltip.classList.remove('show');
                         if (uniqueTooltip) uniqueTooltip.classList.remove('show');
                         if (ayahMarkerTooltip) ayahMarkerTooltip.classList.remove('show');
+                        if (startAyahTooltip) startAyahTooltip.classList.remove('show');
                     }
                 });
             } catch (error) {
@@ -911,19 +922,31 @@
             }
 
             const singleVerseOnly = document.getElementById('single-verse-only').checked;
+            const startOfAyah = document.getElementById('start-of-ayah').checked;
             const uniqueInQuran = document.getElementById('unique-in-quran') ? 
                                   document.getElementById('unique-in-quran').checked : true;
             
             // Determine which word list to check uniqueness against
             const checkAgainst = uniqueInQuran ? quranWords : filteredWords;
             
+            // Filter to only words at the start of ayah if option is selected
+            let wordsToSearchFrom = filteredWords;
+            if (startOfAyah) {
+                wordsToSearchFrom = filteredWords.filter(word => word.wordInAya === 1);
+                if (wordsToSearchFrom.length === 0) {
+                    errorDiv.textContent = 'No words at the beginning of ayahs available with current filter settings.';
+                    errorDiv.style.display = 'block';
+                    return;
+                }
+            }
+            
             let uniquePhrase = null;
             let attempts = 0;
             const maxAttempts = 100;
 
             while (!uniquePhrase && attempts < maxAttempts) {
-                const randomIndex = Math.floor(Math.random() * filteredWords.length);
-                uniquePhrase = findUniquePhraseFromIndex(randomIndex, filteredWords, singleVerseOnly, checkAgainst);
+                const randomIndex = Math.floor(Math.random() * wordsToSearchFrom.length);
+                uniquePhrase = findUniquePhraseFromIndex(randomIndex, wordsToSearchFrom, singleVerseOnly, checkAgainst);
                 attempts++;
             }
 
@@ -985,6 +1008,13 @@
         function toggleAyahMarkerTooltip(event) {
             event.stopPropagation();
             const tooltip = document.getElementById('ayah-marker-tooltip');
+            tooltip.classList.toggle('show');
+        }
+
+        // Toggle start ayah tooltip visibility
+        function toggleStartAyahTooltip(event) {
+            event.stopPropagation();
+            const tooltip = document.getElementById('start-ayah-tooltip');
             tooltip.classList.toggle('show');
         }
 
