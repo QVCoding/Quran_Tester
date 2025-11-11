@@ -980,12 +980,9 @@
             document.getElementById('show-more-btn').disabled = false;
             document.getElementById('show-previous-btn').style.display = 'inline-block';
             
-            // Check if we're at the beginning of filteredWords and disable previous button if so
+            // Check if we're at the beginning of the Quran and disable previous button if so
             const firstDisplayedWord = displayedWords[0];
-            const firstIndexInFiltered = filteredWords.findIndex(w => 
-                w.globalWordNumber === firstDisplayedWord.globalWordNumber
-            );
-            document.getElementById('show-previous-btn').disabled = (firstIndexInFiltered === 0);
+            document.getElementById('show-previous-btn').disabled = (firstDisplayedWord.globalWordNumber === 1);
             
             document.getElementById('reveal-btn').style.display = 'inline-block';
             document.getElementById('reveal-btn').disabled = false;
@@ -1065,16 +1062,18 @@
         function showMoreWord() {
             if (!currentQuestion) return;
 
-            // Find the last displayed word's position in filteredWords
+            // Find the last displayed word's global position in the entire Quran
             const lastDisplayedWord = displayedWords[displayedWords.length - 1];
-            const lastIndexInFiltered = currentQuestion.filteredWords.findIndex(w => 
-                w.globalWordNumber === lastDisplayedWord.globalWordNumber
-            );
+            const nextGlobalNumber = lastDisplayedWord.globalWordNumber + 1;
             
-            if (lastIndexInFiltered >= 0 && lastIndexInFiltered + 1 < currentQuestion.filteredWords.length) {
-                displayedWords.push(currentQuestion.filteredWords[lastIndexInFiltered + 1]);
+            // Find the next word in the actual Quran
+            const nextWord = quranWords.find(w => w.globalWordNumber === nextGlobalNumber);
+            
+            if (nextWord) {
+                displayedWords.push(nextWord);
                 displayPhrase();
             } else {
+                // Reached end of Quran
                 document.getElementById('show-more-btn').disabled = true;
             }
         }
@@ -1083,16 +1082,18 @@
         function showPreviousWord() {
             if (!currentQuestion) return;
 
-            // Find the first displayed word's position in filteredWords
+            // Find the first displayed word's global position in the entire Quran
             const firstDisplayedWord = displayedWords[0];
-            const firstIndexInFiltered = currentQuestion.filteredWords.findIndex(w => 
-                w.globalWordNumber === firstDisplayedWord.globalWordNumber
-            );
+            const prevGlobalNumber = firstDisplayedWord.globalWordNumber - 1;
             
-            if (firstIndexInFiltered > 0) {
-                displayedWords.unshift(currentQuestion.filteredWords[firstIndexInFiltered - 1]);
+            // Find the previous word in the actual Quran
+            const prevWord = quranWords.find(w => w.globalWordNumber === prevGlobalNumber);
+            
+            if (prevWord) {
+                displayedWords.unshift(prevWord);
                 displayPhrase();
             } else {
+                // Reached beginning of Quran
                 document.getElementById('show-previous-btn').disabled = true;
             }
         }
