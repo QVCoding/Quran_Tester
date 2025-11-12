@@ -125,7 +125,7 @@
             color: var(--text-secondary);
         }
 
-        select, input[type="text"] {
+        select, input[type="text"], input[type="number"] {
             width: 100%;
             padding: 8px;
             border: 1px solid var(--border-color);
@@ -247,8 +247,21 @@
             background-color: var(--button-primary-hover);
         }
 
-        button[style*="background-color: #27ae60"]:hover {
-            background-color: #229954 !important;
+        button#change-settings-btn {
+            background-color: #95a5a6;
+        }
+
+        button#change-settings-btn:hover {
+            background-color: #7f8c8d;
+        }
+
+        button#reveal-btn {
+            background-color: #00ff00;
+            color: #000;
+        }
+
+        button#reveal-btn:hover {
+            background-color: #00dd00;
         }
 
         button:disabled {
@@ -339,6 +352,12 @@
             border-radius: 4px;
             margin-bottom: 10px;
             transition: background-color 0.3s, color 0.3s;
+        }
+
+        .occurrence-inputs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
         }
 
         @media (max-width: 600px) {
@@ -445,9 +464,13 @@
 
                     <div class="control-group">
                         <label for="page-range">Page Select (comma separated ranges, e.g. "1-100" or "1-100, 150-200"):</label>
-                        <input type="text" id="page-range" placeholder="e.g., 1-100, 150-200, 300">
+                        <input type="text" id="page-range" placeholder="">
                         <div id="page-range-error" style="color: var(--error-text); font-size: 13px; margin-top: 5px; display: none;">Invalid Range</div>
                     </div>
+                </div>
+
+                <div class="control-group" style="margin-top: 20px;">
+                    <label><strong>Options:</strong></label>
                 </div>
 
                 <div class="checkbox-group">
@@ -469,7 +492,7 @@
                 </div>
 
                 <div class="checkbox-group">
-                    <input type="checkbox" id="show-ayah-marker">
+                    <input type="checkbox" id="show-ayah-marker" checked>
                     <label for="show-ayah-marker">Show ayah marker</label>
                     <span class="info-icon" onclick="toggleAyahMarkerTooltip(event)">i</span>
                     <div id="ayah-marker-tooltip" class="info-tooltip">
@@ -481,11 +504,34 @@
                     <input type="checkbox" id="show-page-image" checked>
                     <label for="show-page-image">Show page image when revealing answer</label>
                 </div>
+
+                <div class="checkbox-group">
+                    <input type="checkbox" id="restrict-length">
+                    <label for="restrict-length">Restrict length of phrase</label>
+                    <span class="info-icon" onclick="toggleLengthTooltip(event)">i</span>
+                    <div id="length-tooltip" class="info-tooltip">
+                        The minimum and maximum number of words in the unique phrase. CAUTION: Searching can take a while. If the minimum is set too high, it could lead to no results being found.
+                    </div>
+                </div>
+
+                <div id="length-inputs" class="control-group" style="display: none; margin-left: 30px; margin-top: 10px;">
+                    <div class="occurrence-inputs">
+                        <div>
+                            <label style="font-size: 13px; font-weight: normal;">Minimum words:</label>
+                            <input type="number" id="min-length" min="1" max="25" placeholder="">
+                        </div>
+                        <div>
+                            <label style="font-size: 13px; font-weight: normal;">Maximum words:</label>
+                            <input type="number" id="max-length" min="1" max="25" placeholder="">
+                            <div id="length-error" style="color: var(--error-text); font-size: 13px; margin-top: 5px; display: none;"></div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div class="button-group">
                 <button id="new-question-btn" onclick="startNewQuestion()">New Question</button>
-                <button id="change-settings-btn" onclick="showSettings()" style="display: none; background-color: #27ae60;">Change Settings</button>
+                <button id="change-settings-btn" onclick="showSettings()" style="display: none;">Change Settings</button>
             </div>
 
             <div id="error-message" class="error" style="display: none;"></div>
@@ -671,6 +717,16 @@
                     }
                 });
 
+                // Toggle length restriction inputs
+                document.getElementById('restrict-length').addEventListener('change', (e) => {
+                    const lengthInputs = document.getElementById('length-inputs');
+                    if (e.target.checked) {
+                        lengthInputs.style.display = 'block';
+                    } else {
+                        lengthInputs.style.display = 'none';
+                    }
+                });
+
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('app').style.display = 'block';
 
@@ -700,10 +756,12 @@
                         const uniqueTooltip = document.getElementById('unique-tooltip');
                         const ayahMarkerTooltip = document.getElementById('ayah-marker-tooltip');
                         const startAyahTooltip = document.getElementById('start-ayah-tooltip');
+                        const lengthTooltip = document.getElementById('length-tooltip');
                         if (verseTooltip) verseTooltip.classList.remove('show');
                         if (uniqueTooltip) uniqueTooltip.classList.remove('show');
                         if (ayahMarkerTooltip) ayahMarkerTooltip.classList.remove('show');
                         if (startAyahTooltip) startAyahTooltip.classList.remove('show');
+                        if (lengthTooltip) lengthTooltip.classList.remove('show');
                     }
                 });
             } catch (error) {
@@ -866,8 +924,45 @@
         }
 
         // Find unique phrase starting from a word
-        function findUniquePhraseFromIndex(startIndex, filteredWords, singleVerseOnly, checkAgainst) {
+        function findUniquePhraseFromIndex(startIndex, filteredWords, singleVerseOnly, checkAgainst, targetLength) {
             const startWord = filteredWords[startIndex];
+            
+            // If targetLength is specified, build phrase of exactly that length
+            if (targetLength) {
+                let length = 1;
+                
+                while (length < targetLength) {
+                    if (startIndex + length >= filteredWords.length) {
+                        return null; // Not enough words
+                    }
+                    
+                    // Check if we've crossed verse boundary
+                    if (singleVerseOnly) {
+                        const currentWord = filteredWords[startIndex + length];
+                        if (currentWord.sura !== startWord.sura || currentWord.aya !== startWord.aya) {
+                            return null; // Crossed boundary
+                        }
+                    }
+                    
+                    length++;
+                }
+                
+                // Now check if this phrase of targetLength is unique
+                if (isPhraseUnique(startIndex, targetLength, filteredWords, checkAgainst)) {
+                    const phrase = [];
+                    for (let i = 0; i < targetLength; i++) {
+                        phrase.push(filteredWords[startIndex + i]);
+                    }
+                    return {
+                        words: phrase,
+                        startIndex: startIndex,
+                        length: targetLength
+                    };
+                }
+                return null;
+            }
+            
+            // Original behavior: find minimum length for uniqueness
             let length = 1;
             
             while (startIndex + length <= filteredWords.length) {
@@ -903,8 +998,10 @@
         function startNewQuestion() {
             const errorDiv = document.getElementById('error-message');
             const pageRangeError = document.getElementById('page-range-error');
+            const lengthError = document.getElementById('length-error');
             errorDiv.style.display = 'none';
             pageRangeError.style.display = 'none';
+            lengthError.style.display = 'none';
 
             const filteredWords = getFilteredWords();
             
@@ -926,8 +1023,29 @@
 
             const singleVerseOnly = document.getElementById('single-verse-only').checked;
             const startOfAyah = document.getElementById('start-of-ayah').checked;
+            const restrictLength = document.getElementById('restrict-length').checked;
             const uniqueInQuran = document.getElementById('unique-in-quran') ? 
                                   document.getElementById('unique-in-quran').checked : true;
+            
+            // Validate length restriction if enabled
+            let minLength = null;
+            let maxLength = null;
+            if (restrictLength) {
+                minLength = parseInt(document.getElementById('min-length').value);
+                maxLength = parseInt(document.getElementById('max-length').value);
+                
+                if (isNaN(minLength) || isNaN(maxLength) || minLength < 1 || maxLength < 1 || minLength > 25 || maxLength > 25) {
+                    lengthError.textContent = 'Please enter valid length values (1-25).';
+                    lengthError.style.display = 'block';
+                    return;
+                }
+                
+                if (maxLength < minLength) {
+                    lengthError.textContent = 'Maximum length cannot be less than minimum length.';
+                    lengthError.style.display = 'block';
+                    return;
+                }
+            }
             
             // Determine which word list to check uniqueness against
             const checkAgainst = uniqueInQuran ? quranWords : filteredWords;
@@ -949,12 +1067,19 @@
 
             while (!uniquePhrase && attempts < maxAttempts) {
                 const randomIndex = Math.floor(Math.random() * wordsToSearchFrom.length);
-                uniquePhrase = findUniquePhraseFromIndex(randomIndex, wordsToSearchFrom, singleVerseOnly, checkAgainst);
+                
+                // If length restriction enabled, pick random length in range
+                let targetLength = null;
+                if (restrictLength) {
+                    targetLength = Math.floor(Math.random() * (maxLength - minLength + 1)) + minLength;
+                }
+                
+                uniquePhrase = findUniquePhraseFromIndex(randomIndex, wordsToSearchFrom, singleVerseOnly, checkAgainst, targetLength);
                 attempts++;
             }
 
             if (!uniquePhrase) {
-                errorDiv.textContent = 'Could not find a unique phrase. Try different filter settings.';
+                errorDiv.textContent = 'No results found.';
                 errorDiv.style.display = 'block';
                 return;
             }
@@ -997,6 +1122,7 @@
             document.getElementById('change-settings-btn').style.display = 'none';
             document.getElementById('new-question-btn').style.display = 'inline-block';
             document.getElementById('page-range-error').style.display = 'none';
+            document.getElementById('length-error').style.display = 'none';
             currentQuestion = null;
         }
 
@@ -1025,6 +1151,13 @@
         function toggleStartAyahTooltip(event) {
             event.stopPropagation();
             const tooltip = document.getElementById('start-ayah-tooltip');
+            tooltip.classList.toggle('show');
+        }
+
+        // Toggle length tooltip visibility
+        function toggleLengthTooltip(event) {
+            event.stopPropagation();
+            const tooltip = document.getElementById('length-tooltip');
             tooltip.classList.toggle('show');
         }
 
