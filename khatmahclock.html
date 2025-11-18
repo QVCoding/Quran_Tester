@@ -113,6 +113,142 @@
             color: rgba(255, 255, 255, 0.5);
         }
 
+        .time-input-container {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 1.1em;
+        }
+
+        .time-input-box {
+            width: 50px;
+            padding: 10px;
+            font-size: 1.1em;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border-radius: 8px;
+            outline: none;
+            font-family: 'Courier New', monospace;
+            text-align: center;
+        }
+
+        .time-input-box:focus {
+            border-color: rgba(255, 255, 255, 0.6);
+        }
+
+        .time-input-separator {
+            color: white;
+            font-weight: bold;
+            font-size: 1.3em;
+        }
+
+        .time-input-error {
+            color: #ff6b6b;
+            font-size: 0.85em;
+            margin-top: 5px;
+            min-height: 20px;
+        }
+
+        .adjust-time-btn {
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+            padding: 10px 30px;
+            font-size: 1em;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: all 0.3s;
+        }
+
+        .adjust-time-btn:hover {
+            background: rgba(255, 255, 255, 0.25);
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .overlay-content {
+            background: rgba(30, 60, 114, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            max-width: 500px;
+            width: 90%;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .overlay h2 {
+            margin-bottom: 25px;
+            text-align: center;
+        }
+
+        .adjust-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 30px;
+        }
+
+        .adjust-buttons .btn-full {
+            grid-column: 1 / -1;
+        }
+
+        .btn-add {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .btn-add:hover {
+            background: #45a049;
+        }
+
+        .timeline-section .btn-add {
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .btn-subtract {
+            background: #f44336;
+            color: white;
+        }
+
+        .btn-subtract:hover {
+            background: #da190b;
+        }
+
+        .btn-skip {
+            background: #2196F3;
+            color: white;
+        }
+
+        .btn-skip:hover {
+            background: #0b7dda;
+        }
+
+        .btn-cancel {
+            background: #9E9E9E;
+            color: white;
+        }
+
+        .btn-cancel:hover {
+            background: #757575;
+        }
+
         .timeline-section {
             margin-top: 30px;
         }
@@ -191,17 +327,6 @@
             background: rgba(255, 255, 255, 0.3);
         }
 
-        .btn-add {
-            width: 100%;
-            background: rgba(255, 255, 255, 0.15);
-            color: white;
-            margin-top: 10px;
-        }
-
-        .btn-add:hover {
-            background: rgba(255, 255, 255, 0.25);
-        }
-
         .button-group {
             display: flex;
             justify-content: center;
@@ -255,7 +380,7 @@
         }
 
         .page-counter {
-            font-size: 5em;
+            font-size: 6.5em;
             font-weight: 600;
             color: #FFD700;
             text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.5);
@@ -448,6 +573,8 @@
                     </div>
                 </div>
                 
+                <button class="adjust-time-btn" onclick="openAdjustTimeOverlay()">± Adjust Time</button>
+                
                 <div class="page-counter" id="pageCounter">1</div>
                 <div class="page-label">Current Page</div>
             </div>
@@ -470,6 +597,41 @@
             <div class="control-buttons">
                 <button class="btn-secondary" id="pauseBtn" onclick="togglePause()">Pause</button>
                 <button class="btn-danger" onclick="resetTimer()">Reset</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Adjust Time Overlay -->
+    <div id="adjustTimeOverlay" class="overlay hidden">
+        <div class="overlay-content">
+            <h2>⏱️ Adjust Time</h2>
+            
+            <div class="form-group">
+                <label>Time Amount:</label>
+                <div class="time-input-container">
+                    <input type="text" class="time-input-box" id="adjust-hours" 
+                           placeholder="00" maxlength="2"
+                           oninput="handleAdjustTimeInput('hours', this.value)"
+                           onfocus="this.select()">
+                    <span class="time-input-separator">:</span>
+                    <input type="text" class="time-input-box" id="adjust-minutes" 
+                           placeholder="00" maxlength="2"
+                           oninput="handleAdjustTimeInput('minutes', this.value)"
+                           onfocus="this.select()">
+                    <span class="time-input-separator">:</span>
+                    <input type="text" class="time-input-box" id="adjust-seconds" 
+                           placeholder="00" maxlength="2"
+                           oninput="handleAdjustTimeInput('seconds', this.value)"
+                           onfocus="this.select()">
+                </div>
+                <div class="time-input-error" id="adjust-error"></div>
+            </div>
+
+            <div class="adjust-buttons">
+                <button class="btn-add" onclick="adjustTime('add')">+ Add Time</button>
+                <button class="btn-subtract" onclick="adjustTime('subtract')">− Subtract Time</button>
+                <button class="btn-skip btn-full" onclick="skipToNextSegment()">⏭️ Skip to Next Segment</button>
+                <button class="btn-cancel btn-full" onclick="closeAdjustTimeOverlay()">Cancel</button>
             </div>
         </div>
     </div>
@@ -506,7 +668,7 @@
 
         function addSegment() {
             const segment = {
-                duration: 60,
+                duration: 0,
                 isBreak: timerState.timeline.length % 2 === 1
             };
             timerState.timeline.push(segment);
@@ -526,16 +688,36 @@
                 const div = document.createElement('div');
                 div.className = 'timeline-segment';
                 
-                // Convert seconds to HH:MM:SS
-                const timeStr = formatTimeInput(segment.duration);
+                // Convert seconds to HH, MM, SS
+                const hours = Math.floor(segment.duration / 3600);
+                const minutes = Math.floor((segment.duration % 3600) / 60);
+                const secs = segment.duration % 60;
                 
                 div.innerHTML = `
                     <div class="segment-label">Segment ${index + 1}: ${segment.isBreak ? 'Break' : 'Reading'}</div>
                     <div class="segment-inputs">
                         <div class="input-group">
-                            <label>Duration (HH:MM:SS):</label>
-                            <input type="text" value="${timeStr}" placeholder="00:00:00"
-                                   onchange="updateSegmentTime(${index}, this.value)">
+                            <label>Duration:</label>
+                            <div class="time-input-container">
+                                <input type="text" class="time-input-box" id="hours-${index}" 
+                                       placeholder="00" maxlength="2"
+                                       oninput="handleTimeInput(${index}, 'hours', this.value)"
+                                       onfocus="this.select()"
+                                       onblur="validateTimeInput(${index})">
+                                <span class="time-input-separator">:</span>
+                                <input type="text" class="time-input-box" id="minutes-${index}" 
+                                       placeholder="00" maxlength="2"
+                                       oninput="handleTimeInput(${index}, 'minutes', this.value)"
+                                       onfocus="this.select()"
+                                       onblur="validateTimeInput(${index})">
+                                <span class="time-input-separator">:</span>
+                                <input type="text" class="time-input-box" id="seconds-${index}" 
+                                       placeholder="00" maxlength="2"
+                                       oninput="handleTimeInput(${index}, 'seconds', this.value)"
+                                       onfocus="this.select()"
+                                       onblur="validateTimeInput(${index})">
+                            </div>
+                            <div class="time-input-error" id="error-${index}"></div>
                         </div>
                         <div class="input-group">
                             <label>Type:</label>
@@ -548,32 +730,75 @@
                     </div>
                 `;
                 container.appendChild(div);
+                
+                // Set values after elements are added to DOM (only if they're non-zero)
+                setTimeout(() => {
+                    if (hours > 0 || minutes > 0 || secs > 0) {
+                        document.getElementById(`hours-${index}`).value = hours > 0 ? hours.toString().padStart(2, '0') : '';
+                        document.getElementById(`minutes-${index}`).value = minutes > 0 ? minutes.toString().padStart(2, '0') : '';
+                        document.getElementById(`seconds-${index}`).value = secs > 0 ? secs.toString().padStart(2, '0') : '';
+                    }
+                }, 0);
             });
         }
 
-        function formatTimeInput(seconds) {
-            const hours = Math.floor(seconds / 3600);
-            const minutes = Math.floor((seconds % 3600) / 60);
-            const secs = seconds % 60;
-            return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-        }
-
-        function parseTimeInput(timeStr) {
-            const parts = timeStr.split(':').map(p => parseInt(p) || 0);
-            if (parts.length === 3) {
-                return parts[0] * 3600 + parts[1] * 60 + parts[2];
-            } else if (parts.length === 2) {
-                return parts[0] * 60 + parts[1];
-            } else if (parts.length === 1) {
-                return parts[0];
+        function handleTimeInput(index, field, value) {
+            // Remove non-digits
+            value = value.replace(/\D/g, '');
+            
+            const input = document.getElementById(`${field}-${index}`);
+            
+            // If value is too long, trim it
+            if (value.length > 2) {
+                value = value.slice(-2);
             }
-            return 60; // default 1 minute
+            
+            // Update display (no padding during input)
+            input.value = value;
+            
+            // Update the segment duration
+            updateSegmentFromInputs(index);
         }
 
-        function updateSegmentTime(index, value) {
-            const seconds = parseTimeInput(value);
-            timerState.timeline[index].duration = Math.max(1, seconds);
-            renderSegments();
+        function updateSegmentFromInputs(index) {
+            const hoursVal = document.getElementById(`hours-${index}`).value;
+            const minutesVal = document.getElementById(`minutes-${index}`).value;
+            const secondsVal = document.getElementById(`seconds-${index}`).value;
+            
+            const hours = hoursVal ? parseInt(hoursVal) : 0;
+            const minutes = minutesVal ? parseInt(minutesVal) : 0;
+            const seconds = secondsVal ? parseInt(secondsVal) : 0;
+            
+            timerState.timeline[index].duration = hours * 3600 + minutes * 60 + seconds;
+        }
+
+        function validateTimeInput(index) {
+            const hoursInput = document.getElementById(`hours-${index}`);
+            const minutesInput = document.getElementById(`minutes-${index}`);
+            const secondsInput = document.getElementById(`seconds-${index}`);
+            
+            const hoursVal = hoursInput.value;
+            const minutesVal = minutesInput.value;
+            const secondsVal = secondsInput.value;
+            
+            const hours = hoursVal ? parseInt(hoursVal) : 0;
+            const minutes = minutesVal ? parseInt(minutesVal) : 0;
+            const seconds = secondsVal ? parseInt(secondsVal) : 0;
+            
+            const errorDiv = document.getElementById(`error-${index}`);
+            
+            if (minutes >= 60 || seconds >= 60) {
+                errorDiv.textContent = 'Please enter a valid value (minutes and seconds must be less than 60)';
+                return false;
+            } else {
+                errorDiv.textContent = '';
+                // Pad with zeros on blur (only if there's a value)
+                if (hoursVal) hoursInput.value = hours.toString().padStart(2, '0');
+                if (minutesVal) minutesInput.value = minutes.toString().padStart(2, '0');
+                if (secondsVal) secondsInput.value = seconds.toString().padStart(2, '0');
+                updateSegmentFromInputs(index);
+                return true;
+            }
         }
 
         function toggleSegmentType(index) {
@@ -587,6 +812,14 @@
             if (timerState.timeline.length === 0) {
                 alert('Please add at least one segment to the timeline.');
                 return;
+            }
+
+            // Validate that all segments have durations greater than 0
+            for (let i = 0; i < timerState.timeline.length; i++) {
+                if (timerState.timeline[i].duration === 0) {
+                    alert(`Please enter a duration for Segment ${i + 1} before starting.`);
+                    return;
+                }
             }
 
             // Calculate total reading time (in seconds)
@@ -640,15 +873,20 @@
 
             timerState.segmentTimeRemaining -= elapsed;
 
-            // Update page counter if in reading mode
+            // Update page counter if in reading mode (and only if we're actively reading)
             const currentSegment = timerState.timeline[timerState.currentSegmentIndex];
             if (!currentSegment.isBreak) {
                 const secondsPerPage = timerState.totalReadingTime / timerState.totalPages;
                 const elapsedReadingTime = getElapsedReadingTime();
-                timerState.currentPage = Math.min(
+                const calculatedPage = Math.min(
                     Math.floor(elapsedReadingTime / secondsPerPage) + 1,
                     timerState.totalPages
                 );
+                
+                // Only update if calculated page is higher (prevents going backwards after adjustments)
+                if (calculatedPage > timerState.currentPage) {
+                    timerState.currentPage = calculatedPage;
+                }
             }
 
             // Move to next segment if current one is finished
@@ -849,6 +1087,159 @@
             timerState.isRunning = false;
             alert('Alhamdulillah! Khatmah completed! 🎉');
             resetTimer();
+        }
+
+        function openAdjustTimeOverlay() {
+            // Reset the input fields to empty
+            document.getElementById('adjust-hours').value = '';
+            document.getElementById('adjust-minutes').value = '';
+            document.getElementById('adjust-seconds').value = '';
+            document.getElementById('adjust-error').textContent = '';
+            
+            // Show overlay (timer continues in background)
+            document.getElementById('adjustTimeOverlay').classList.remove('hidden');
+        }
+
+        function closeAdjustTimeOverlay() {
+            document.getElementById('adjustTimeOverlay').classList.add('hidden');
+        }
+
+        function handleAdjustTimeInput(field, value) {
+            // Remove non-digits
+            value = value.replace(/\D/g, '');
+            
+            const input = document.getElementById(`adjust-${field}`);
+            
+            // If value is too long, trim it
+            if (value.length > 2) {
+                value = value.slice(-2);
+            }
+            
+            // Update display (no padding during input)
+            input.value = value;
+        }
+
+        function validateAdjustTime() {
+            const hoursVal = document.getElementById('adjust-hours').value;
+            const minutesVal = document.getElementById('adjust-minutes').value;
+            const secondsVal = document.getElementById('adjust-seconds').value;
+            
+            const hours = hoursVal ? parseInt(hoursVal) : 0;
+            const minutes = minutesVal ? parseInt(minutesVal) : 0;
+            const seconds = secondsVal ? parseInt(secondsVal) : 0;
+            
+            const errorDiv = document.getElementById('adjust-error');
+            
+            if (minutes >= 60 || seconds >= 60) {
+                errorDiv.textContent = 'Please enter a valid value (minutes and seconds must be less than 60)';
+                return null;
+            }
+            
+            const totalSeconds = hours * 3600 + minutes * 60 + seconds;
+            if (totalSeconds === 0) {
+                errorDiv.textContent = 'Please enter a time amount greater than zero';
+                return null;
+            }
+            
+            errorDiv.textContent = '';
+            return totalSeconds;
+        }
+
+        function adjustTime(action) {
+            const adjustSeconds = validateAdjustTime();
+            if (adjustSeconds === null) return;
+            
+            const actionText = action === 'add' ? 'add' : 'subtract';
+            const timeStr = formatTime(adjustSeconds);
+            
+            // Store current page before adjustment
+            const preservedPage = timerState.currentPage;
+            
+            // Use setTimeout to prevent confirm from blocking timer
+            setTimeout(() => {
+                if (!confirm(`Are you sure you want to ${actionText} ${timeStr} ${action === 'add' ? 'to' : 'from'} the current segment?`)) {
+                    return;
+                }
+                
+                // Adjust the current segment time
+                if (action === 'add') {
+                    timerState.segmentTimeRemaining += adjustSeconds;
+                    timerState.timeline[timerState.currentSegmentIndex].duration += adjustSeconds;
+                } else {
+                    timerState.segmentTimeRemaining -= adjustSeconds;
+                    timerState.timeline[timerState.currentSegmentIndex].duration -= adjustSeconds;
+                    
+                    // If time goes negative or zero, move to next segment
+                    if (timerState.segmentTimeRemaining <= 0) {
+                        timerState.currentSegmentIndex++;
+                        
+                        if (timerState.currentSegmentIndex >= timerState.timeline.length) {
+                            completeTimer();
+                            closeAdjustTimeOverlay();
+                            return;
+                        }
+                        
+                        timerState.segmentTimeRemaining = timerState.timeline[timerState.currentSegmentIndex].duration;
+                    }
+                }
+                
+                // Recalculate total reading time (this changes the rate)
+                timerState.totalReadingTime = timerState.timeline
+                    .filter(s => !s.isBreak)
+                    .reduce((sum, s) => sum + s.duration, 0);
+                
+                // Preserve the current page - DO NOT recalculate it
+                timerState.currentPage = preservedPage;
+                
+                // Force progress bar rebuild
+                const progressBar = document.getElementById('progressBar');
+                if (progressBar) {
+                    progressBar.removeAttribute('data-initialized');
+                }
+                
+                // Update display
+                updateDisplay();
+                saveState();
+                
+                closeAdjustTimeOverlay();
+            }, 0);
+        }
+
+        function skipToNextSegment() {
+            // Store current page before adjustment
+            const preservedPage = timerState.currentPage;
+            
+            // Use setTimeout to prevent confirm from blocking timer
+            setTimeout(() => {
+                if (!confirm('Are you sure you want to skip to the next segment?')) {
+                    return;
+                }
+                
+                timerState.currentSegmentIndex++;
+                
+                if (timerState.currentSegmentIndex >= timerState.timeline.length) {
+                    completeTimer();
+                    closeAdjustTimeOverlay();
+                    return;
+                }
+                
+                timerState.segmentTimeRemaining = timerState.timeline[timerState.currentSegmentIndex].duration;
+                
+                // Preserve the current page
+                timerState.currentPage = preservedPage;
+                
+                // Force progress bar rebuild
+                const progressBar = document.getElementById('progressBar');
+                if (progressBar) {
+                    progressBar.removeAttribute('data-initialized');
+                }
+                
+                // Update display
+                updateDisplay();
+                saveState();
+                
+                closeAdjustTimeOverlay();
+            }, 0);
         }
 
         function saveState() {
