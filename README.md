@@ -17,3 +17,5 @@ Run `make_quran_words.py`, then convert the resulting file to csv.
  `Minimum_Phrase_Tester.html` App which shows a unique-phrase (with no more words than necessary for the phrase to be uniquely identifiable) for the user to identify.
 
  `Occurrences_Tester.html` App which tests the user in identifying the recurrences of phrases in the Quran.
+
+ `khatmahclock.html` App which has a countdown for Quran Khatmas - showing what page the reciter must be up to to finish on time.
