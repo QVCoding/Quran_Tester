@@ -639,6 +639,7 @@
     <script>
         let timerState = {
             totalPages: 604,
+            originalTotalPages: 604,  // Store original user input
             timeline: [],
             currentSegmentIndex: 0,
             segmentTimeRemaining: 0,
@@ -646,7 +647,8 @@
             currentPage: 1,
             isPaused: false,
             isRunning: false,
-            lastTickTime: null
+            lastTickTime: null,
+            actualElapsedReadingTime: 0  // Track actual reading time independent of skips
         };
 
         let timerInterval = null;
@@ -808,6 +810,7 @@
 
         function startTimer() {
             timerState.totalPages = parseInt(document.getElementById('totalPages').value) || 604;
+            timerState.originalTotalPages = timerState.totalPages;  // Store original
             
             if (timerState.timeline.length === 0) {
                 alert('Please add at least one segment to the timeline.');
@@ -839,6 +842,7 @@
             timerState.isPaused = false;
             timerState.isRunning = true;
             timerState.lastTickTime = Date.now();
+            timerState.actualElapsedReadingTime = 0;
 
             saveState();
             showTimerScreen();
@@ -876,11 +880,18 @@
             // Update page counter if in reading mode (and only if we're actively reading)
             const currentSegment = timerState.timeline[timerState.currentSegmentIndex];
             if (!currentSegment.isBreak) {
+                // Increment actual elapsed reading time
+                timerState.actualElapsedReadingTime += elapsed;
+                
                 const secondsPerPage = timerState.totalReadingTime / timerState.totalPages;
-                const elapsedReadingTime = getElapsedReadingTime();
+                
+                // Calculate page progress from the base (after adjustments, we reset to current page)
+                // We need to figure out what our base page is
+                const basePageNumber = timerState.originalTotalPages - timerState.totalPages;
+                const pagesProgressed = Math.floor(timerState.actualElapsedReadingTime / secondsPerPage);
                 const calculatedPage = Math.min(
-                    Math.floor(elapsedReadingTime / secondsPerPage) + 1,
-                    timerState.totalPages
+                    basePageNumber + pagesProgressed,
+                    timerState.originalTotalPages
                 );
                 
                 // Only update if calculated page is higher (prevents going backwards after adjustments)
@@ -1161,6 +1172,9 @@
                     return;
                 }
                 
+                // Store current page before adjustment
+                const preservedPage = timerState.currentPage;
+                
                 // Adjust the current segment time
                 if (action === 'add') {
                     timerState.segmentTimeRemaining += adjustSeconds;
@@ -1183,12 +1197,35 @@
                     }
                 }
                 
-                // Recalculate total reading time (this changes the rate)
-                timerState.totalReadingTime = timerState.timeline
-                    .filter(s => !s.isBreak)
-                    .reduce((sum, s) => sum + s.duration, 0);
+                // Calculate remaining reading time from current position onwards
+                let remainingReadingTime = 0;
+                const currentSegment = timerState.timeline[timerState.currentSegmentIndex];
                 
-                // Preserve the current page - DO NOT recalculate it
+                // Add remaining time in current segment if it's reading
+                if (!currentSegment.isBreak) {
+                    remainingReadingTime += timerState.segmentTimeRemaining;
+                }
+                
+                // Add all future reading segments
+                for (let i = timerState.currentSegmentIndex + 1; i < timerState.timeline.length; i++) {
+                    if (!timerState.timeline[i].isBreak) {
+                        remainingReadingTime += timerState.timeline[i].duration;
+                    }
+                }
+                
+                // Calculate pages remaining (use originalTotalPages, not totalPages)
+                const pagesRemaining = timerState.originalTotalPages - preservedPage;
+                
+                // Calculate new rate: remaining reading time / pages remaining
+                // The tick function will use: page = floor(actualElapsedReadingTime / secondsPerPage) + preservedPage
+                // So we set totalReadingTime and totalPages such that the rate works out
+                timerState.totalReadingTime = remainingReadingTime;
+                timerState.totalPages = pagesRemaining;
+                
+                // Reset actualElapsedReadingTime to 0 (starting fresh from preserved page)
+                timerState.actualElapsedReadingTime = 0;
+                
+                // Restore the preserved page
                 timerState.currentPage = preservedPage;
                 
                 // Force progress bar rebuild
@@ -1224,6 +1261,32 @@
                 }
                 
                 timerState.segmentTimeRemaining = timerState.timeline[timerState.currentSegmentIndex].duration;
+                
+                // Calculate remaining reading time from current position onwards
+                let remainingReadingTime = 0;
+                const currentSegment = timerState.timeline[timerState.currentSegmentIndex];
+                
+                // Add remaining time in current segment if it's reading
+                if (!currentSegment.isBreak) {
+                    remainingReadingTime += timerState.segmentTimeRemaining;
+                }
+                
+                // Add all future reading segments
+                for (let i = timerState.currentSegmentIndex + 1; i < timerState.timeline.length; i++) {
+                    if (!timerState.timeline[i].isBreak) {
+                        remainingReadingTime += timerState.timeline[i].duration;
+                    }
+                }
+                
+                // Calculate pages remaining (use originalTotalPages)
+                const pagesRemaining = timerState.originalTotalPages - preservedPage;
+                
+                // Update rate calculation variables
+                timerState.totalReadingTime = remainingReadingTime;
+                timerState.totalPages = pagesRemaining;
+                
+                // Reset actualElapsedReadingTime to 0 (starting fresh from preserved page)
+                timerState.actualElapsedReadingTime = 0;
                 
                 // Preserve the current page
                 timerState.currentPage = preservedPage;
