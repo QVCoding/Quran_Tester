@@ -533,13 +533,80 @@
                 font-size: 3.5em;
             }
         }
-    </style>
+    
+        .mode-toggle {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin: 10px 0 30px 0;
+            flex-wrap: wrap;
+        }
+
+        .mode-toggle label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 18px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 2px solid rgba(255, 255, 255, 0.18);
+            cursor: pointer;
+            user-select: none;
+            margin-bottom: 0;
+            font-size: 1.05em;
+        }
+
+        .mode-toggle input[type="radio"] {
+            transform: scale(1.2);
+            accent-color: #FFD700;
+        }
+
+        .finish-time-row {
+            margin-top: 18px;
+            padding: 18px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(255, 255, 255, 0.18);
+        }
+
+        .finish-time-row .time-input-container {
+            justify-content: flex-start;
+        }
+
+        .ampm-select {
+            width: 90px;
+            padding: 10px;
+            font-size: 1em;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+            border-radius: 8px;
+            outline: none;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+
+</style>
 </head>
 <body>
     <div class="container">
         <!-- Setup Screen -->
         <div id="setupScreen" class="setup-screen">
             <h1>📖 Quran Khatmah Clock</h1>
+
+            <div class="mode-toggle" role="radiogroup" aria-label="Input mode">
+                <label>
+                    <input type="radio" name="inputMode" id="modeDuration" value="duration" checked
+                           onchange="setInputMode('duration')">
+                    Duration
+                </label>
+                <label>
+                    <input type="radio" name="inputMode" id="modeClock" value="clock"
+                           onchange="setInputMode('clock')">
+                    Time (clock)
+                </label>
+            </div>
+
             
             <div class="form-group">
                 <label for="totalPages">Total Pages:</label>
@@ -551,6 +618,29 @@
                 <div id="timelineSegments">
                     <!-- Segments will be added here -->
                 </div>
+                
+                <div id="finishTimeRow" class="finish-time-row hidden">
+                    <label style="margin-bottom: 10px;">Finish Time (end of last segment):</label>
+                    <div class="time-input-container">
+                        <input type="text" class="time-input-box" id="finish-hours"
+                               placeholder="HH" maxlength="2"
+                               oninput="handleFinishTimeInput('hours', this.value)"
+                               onfocus="this.select()"
+                               onblur="validateFinishTime()">
+                        <span class="time-input-separator">:</span>
+                        <input type="text" class="time-input-box" id="finish-minutes"
+                               placeholder="MM" maxlength="2"
+                               oninput="handleFinishTimeInput('minutes', this.value)"
+                               onfocus="this.select()"
+                               onblur="validateFinishTime()">
+                        <select class="ampm-select" id="finish-ampm" onchange="validateFinishTime()">
+                            <option value="AM">AM</option>
+                            <option value="PM" selected>PM</option>
+                        </select>
+                    </div>
+                    <div class="time-input-error" id="finish-error"></div>
+                </div>
+
                 <button class="btn-add" onclick="addSegment()">+ Add Segment</button>
             </div>
 
@@ -562,6 +652,7 @@
         <!-- Timer Screen -->
         <div id="timerScreen" class="timer-screen hidden">
             <div class="status-indicator" id="statusIndicator">Reading</div>
+            <div id="clockWarning" style="margin-top:12px; font-size:1.05em; color:#FFD700; display:none;"></div>
             
             <div class="main-display">
                 <div class="countdown-timer" id="countdownTimer">00:00</div>
@@ -638,6 +729,16 @@
 
     <script>
         let timerState = {
+            inputMode: 'duration',  // 'duration' | 'clock'
+            finishTime: { hours: '', minutes: '', ampm: 'PM' },  // used in clock mode
+            scheduleStartsAbsMs: null,   // [ms] segment start timestamps (clock mode)
+            scheduleFinishAbsMs: null,   // ms finish timestamp (clock mode)
+            scheduleOffsetMs: 0,         // ms added to shift schedule forward (pause/adjust)
+            waitingToStart: false,       // clock mode: before first segment begins
+            rateResetAbsMs: null,        // clock mode: effective start for page pacing
+            pausedAtSystemMs: null,      // clock mode: system time when paused
+            lastSystemNowMs: null,       // clock mode: for clock-jump detection
+
             totalPages: 604,
             originalTotalPages: 604,  // Store original user input
             timeline: [],
@@ -656,6 +757,18 @@
         // Initialize with one segment
         function init() {
             loadState();
+            // Sync input mode UI
+            setInputMode(timerState.inputMode || 'duration');
+            // Restore finish time inputs if present
+            if (timerState.finishTime) {
+                const fh = document.getElementById('finish-hours');
+                const fm = document.getElementById('finish-minutes');
+                const fa = document.getElementById('finish-ampm');
+                if (fh) fh.value = timerState.finishTime.hours || '';
+                if (fm) fm.value = timerState.finishTime.minutes || '';
+                if (fa) fa.value = timerState.finishTime.ampm || 'PM';
+            }
+
             if (timerState.timeline.length === 0) {
                 addSegment();
             } else {
@@ -668,10 +781,302 @@
             }
         }
 
-        function addSegment() {
+        
+        function setInputMode(mode) {
+            timerState.inputMode = mode;
+
+            // Toggle finish time row visibility
+            const finishRow = document.getElementById('finishTimeRow');
+            if (finishRow) {
+                if (mode === 'clock') finishRow.classList.remove('hidden');
+                else finishRow.classList.add('hidden');
+            }
+
+            // Toggle radio UI (in case called programmatically)
+            const rdDur = document.getElementById('modeDuration');
+            const rdClk = document.getElementById('modeClock');
+            if (rdDur && rdClk) {
+                rdDur.checked = mode === 'duration';
+                rdClk.checked = mode === 'clock';
+            }
+
+            renderSegments();
+            saveState();
+        }
+
+        function handleClockTimeInput(index, field, value) {
+            value = value.replace(/\D/g, '');
+            if (value.length > 2) value = value.slice(-2);
+            const input = document.getElementById(`clock-${field}-${index}`);
+            if (input) input.value = value;
+
+            if (!timerState.timeline[index].startTime) {
+                timerState.timeline[index].startTime = { hours: '', minutes: '', ampm: 'PM' };
+            }
+            timerState.timeline[index].startTime[field] = value;
+        }
+
+        function validateClockTimeInput(index) {
+            const hEl = document.getElementById(`clock-hours-${index}`);
+            const mEl = document.getElementById(`clock-minutes-${index}`);
+            const aEl = document.getElementById(`clock-ampm-${index}`);
+            const errEl = document.getElementById(`error-${index}`);
+
+            const hVal = hEl ? hEl.value : '';
+            const mVal = mEl ? mEl.value : '';
+            const ampm = aEl ? aEl.value : 'PM';
+
+            const hours = hVal ? parseInt(hVal, 10) : NaN;
+            const minutes = mVal ? parseInt(mVal, 10) : NaN;
+
+            // Store
+            if (!timerState.timeline[index].startTime) {
+                timerState.timeline[index].startTime = { hours: '', minutes: '', ampm: 'PM' };
+            }
+            timerState.timeline[index].startTime.ampm = ampm;
+
+            // Validation
+            if (Number.isNaN(hours) || Number.isNaN(minutes)) {
+                if (errEl) errEl.textContent = 'Please enter a start time (HH and MM).';
+                return false;
+            }
+            if (minutes >= 60) {
+                if (errEl) errEl.textContent = 'Minutes must be less than 60.';
+                return false;
+            }
+            if (hours < 0 || hours > 23) {
+                if (errEl) errEl.textContent = 'Hours must be between 0 and 23.';
+                return false;
+            }
+
+            // Pretty pad on blur
+            if (hEl) hEl.value = hours.toString().padStart(2, '0');
+            if (mEl) mEl.value = minutes.toString().padStart(2, '0');
+
+            if (errEl) errEl.textContent = '';
+            timerState.timeline[index].startTime.hours = hEl.value;
+            timerState.timeline[index].startTime.minutes = mEl.value;
+            return true;
+        }
+
+        function handleFinishTimeInput(field, value) {
+            value = value.replace(/\D/g, '');
+            if (value.length > 2) value = value.slice(-2);
+            const input = document.getElementById(`finish-${field}`);
+            if (input) input.value = value;
+            timerState.finishTime[field] = value;
+        }
+
+        function validateFinishTime() {
+            const hEl = document.getElementById('finish-hours');
+            const mEl = document.getElementById('finish-minutes');
+            const aEl = document.getElementById('finish-ampm');
+            const errEl = document.getElementById('finish-error');
+
+            const hVal = hEl ? hEl.value : '';
+            const mVal = mEl ? mEl.value : '';
+            const ampm = aEl ? aEl.value : 'PM';
+
+            timerState.finishTime.ampm = ampm;
+
+            const hours = hVal ? parseInt(hVal, 10) : NaN;
+            const minutes = mVal ? parseInt(mVal, 10) : NaN;
+
+            if (Number.isNaN(hours) || Number.isNaN(minutes)) {
+                if (errEl) errEl.textContent = 'Please enter a finish time (HH and MM).';
+                return false;
+            }
+            if (minutes >= 60) {
+                if (errEl) errEl.textContent = 'Minutes must be less than 60.';
+                return false;
+            }
+            if (hours < 0 || hours > 23) {
+                if (errEl) errEl.textContent = 'Hours must be between 0 and 23.';
+                return false;
+            }
+
+            if (hEl) hEl.value = hours.toString().padStart(2, '0');
+            if (mEl) mEl.value = minutes.toString().padStart(2, '0');
+
+            if (errEl) errEl.textContent = '';
+            timerState.finishTime.hours = hEl.value;
+            timerState.finishTime.minutes = mEl.value;
+            saveState();
+            return true;
+        }
+
+        function parseClockToMinutes(hStr, mStr, ampm) {
+            // If hours is 0-23, we treat it as 24h and ignore am/pm.
+            let h = parseInt(hStr, 10);
+            let m = parseInt(mStr, 10);
+
+            if (Number.isNaN(h) || Number.isNaN(m)) return null;
+            if (m < 0 || m >= 60 || h < 0 || h > 23) return null;
+
+            // If user is using 12-hour style (1-12), apply AM/PM conversion.
+            // If they enter 0 or >12, keep as 24h.
+            if (h >= 1 && h <= 12) {
+                if (ampm === 'AM') {
+                    if (h === 12) h = 0;
+                } else if (ampm === 'PM') {
+                    if (h !== 12) h = h + 12;
+                }
+            }
+
+            return h * 60 + m;
+        }
+
+        function buildScheduleFromClockTimes() {
+            // Validate all start times
+            for (let i = 0; i < timerState.timeline.length; i++) {
+                if (!validateClockTimeInput(i)) return false;
+            }
+            if (!validateFinishTime()) return false;
+
+            // Convert entered clock times to minutes-of-day
+            const timesMin = [];
+            for (let i = 0; i < timerState.timeline.length; i++) {
+                const st = timerState.timeline[i].startTime || {};
+                const tMin = parseClockToMinutes(st.hours, st.minutes, st.ampm || 'PM');
+                if (tMin === null) {
+                    alert(`Invalid start time for Segment ${i + 1}.`);
+                    return false;
+                }
+                timesMin.push(tMin);
+            }
+
+            const f = timerState.finishTime || {};
+            const finishMinRaw = parseClockToMinutes(f.hours, f.minutes, f.ampm || 'PM');
+            if (finishMinRaw === null) {
+                alert('Invalid finish time.');
+                return false;
+            }
+
+            // Make an absolute schedule anchored to today's local midnight
+            const now = new Date();
+            const base = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).getTime();
+
+            // Apply rollover (midnight crossing) by adding 24h as needed
+            const absStarts = [];
+            let dayOffsetMin = 0;
+            for (let i = 0; i < timesMin.length; i++) {
+                let t = timesMin[i] + dayOffsetMin;
+                if (i > 0) {
+                    while (t < absStarts[i - 1]) {
+                        dayOffsetMin += 24 * 60;
+                        t = timesMin[i] + dayOffsetMin;
+                    }
+                }
+                absStarts.push(t);
+            }
+
+            let finishAbsMin = finishMinRaw + dayOffsetMin;
+            while (finishAbsMin < absStarts[absStarts.length - 1]) {
+                finishAbsMin += 24 * 60;
+            }
+
+            const scheduleStartsAbsMs = absStarts.map(min => base + min * 60 * 1000);
+            const scheduleFinishAbsMs = base + finishAbsMin * 60 * 1000;
+
+            // Validate non-zero durations
+            for (let i = 0; i < scheduleStartsAbsMs.length; i++) {
+                const start = scheduleStartsAbsMs[i];
+                const end = (i < scheduleStartsAbsMs.length - 1) ? scheduleStartsAbsMs[i + 1] : scheduleFinishAbsMs;
+                if (end <= start) {
+                    alert(`Segment ${i + 1} has zero or negative duration. Please check your times.`);
+                    return false;
+                }
+            }
+
+            timerState.scheduleStartsAbsMs = scheduleStartsAbsMs;
+            timerState.scheduleFinishAbsMs = scheduleFinishAbsMs;
+            timerState.scheduleOffsetMs = 0;
+
+            // Keep timeline durations in sync with schedule (seconds)
+            syncDurationsFromSchedule();
+
+            return true;
+        }
+
+        function getEffectiveNowMs() {
+            return Date.now() - (timerState.scheduleOffsetMs || 0);
+        }
+
+        function syncDurationsFromSchedule() {
+            if (!timerState.scheduleStartsAbsMs || !timerState.scheduleFinishAbsMs) return;
+            for (let i = 0; i < timerState.timeline.length; i++) {
+                const start = timerState.scheduleStartsAbsMs[i];
+                const end = (i < timerState.timeline.length - 1) ? timerState.scheduleStartsAbsMs[i + 1] : timerState.scheduleFinishAbsMs;
+                timerState.timeline[i].duration = Math.max(1, Math.round((end - start) / 1000));
+            }
+        }
+
+        function getSegmentEndMs(index) {
+            if (!timerState.scheduleStartsAbsMs || !timerState.scheduleFinishAbsMs) return null;
+            return (index < timerState.timeline.length - 1)
+                ? timerState.scheduleStartsAbsMs[index + 1]
+                : timerState.scheduleFinishAbsMs;
+        }
+
+        function findSegmentIndexForTime(effectiveNowMs) {
+            if (!timerState.scheduleStartsAbsMs || !timerState.scheduleFinishAbsMs) return null;
+            if (effectiveNowMs < timerState.scheduleStartsAbsMs[0]) return -1; // waiting
+            if (effectiveNowMs >= timerState.scheduleFinishAbsMs) return timerState.timeline.length; // finished
+
+            // Linear scan (timeline is usually small)
+            for (let i = 0; i < timerState.timeline.length; i++) {
+                const start = timerState.scheduleStartsAbsMs[i];
+                const end = getSegmentEndMs(i);
+                if (effectiveNowMs >= start && effectiveNowMs < end) return i;
+            }
+            return timerState.timeline.length; // fallback
+        }
+
+        function getReadingElapsedSecondsBetween(startMs, endMs) {
+            if (!timerState.scheduleStartsAbsMs || !timerState.scheduleFinishAbsMs) return 0;
+            if (endMs <= startMs) return 0;
+
+            let totalMs = 0;
+            for (let i = 0; i < timerState.timeline.length; i++) {
+                if (timerState.timeline[i].isBreak) continue;
+                const segStart = timerState.scheduleStartsAbsMs[i];
+                const segEnd = getSegmentEndMs(i);
+                const a = Math.max(startMs, segStart);
+                const b = Math.min(endMs, segEnd);
+                if (b > a) totalMs += (b - a);
+            }
+            return totalMs / 1000;
+        }
+
+        function applyClockJumpWarning(systemNowMs, expectedDeltaMs) {
+            const warningEl = document.getElementById('clockWarning');
+            if (!warningEl) return;
+
+            const last = timerState.lastSystemNowMs;
+            timerState.lastSystemNowMs = systemNowMs;
+
+            if (!last) {
+                warningEl.style.display = 'none';
+                warningEl.textContent = '';
+                return;
+            }
+
+            const actualDelta = systemNowMs - last;
+            // If the system clock jumps by more than 30s relative to our expected tick cadence, warn.
+            if (Math.abs(actualDelta - expectedDeltaMs) > 30000) {
+                warningEl.textContent = '⚠️ System clock changed — schedule re-synced';
+                warningEl.style.display = 'block';
+            } else {
+                warningEl.style.display = 'none';
+                warningEl.textContent = '';
+            }
+        }
+
+function addSegment() {
             const segment = {
                 duration: 0,
-                isBreak: timerState.timeline.length % 2 === 1
+                isBreak: timerState.timeline.length % 2 === 1,
+                startTime: { hours: '', minutes: '', ampm: 'PM' }
             };
             timerState.timeline.push(segment);
             renderSegments();
@@ -695,7 +1100,40 @@
                 const minutes = Math.floor((segment.duration % 3600) / 60);
                 const secs = segment.duration % 60;
                 
-                div.innerHTML = `
+                div.innerHTML = (timerState.inputMode === 'clock') ? `
+                    <div class="segment-label">Segment ${index + 1}: ${segment.isBreak ? 'Break' : 'Reading'}</div>
+                    <div class="segment-inputs">
+                        <div class="input-group">
+                            <label>Start Time:</label>
+                            <div class="time-input-container">
+                                <input type="text" class="time-input-box" id="clock-hours-${index}" 
+                                       placeholder="HH" maxlength="2"
+                                       oninput="handleClockTimeInput(${index}, 'hours', this.value)"
+                                       onfocus="this.select()"
+                                       onblur="validateClockTimeInput(${index})">
+                                <span class="time-input-separator">:</span>
+                                <input type="text" class="time-input-box" id="clock-minutes-${index}" 
+                                       placeholder="MM" maxlength="2"
+                                       oninput="handleClockTimeInput(${index}, 'minutes', this.value)"
+                                       onfocus="this.select()"
+                                       onblur="validateClockTimeInput(${index})">
+                                <select class="ampm-select" id="clock-ampm-${index}" onchange="validateClockTimeInput(${index})">
+                                    <option value="AM" ${(segment.startTime && segment.startTime.ampm === 'AM') ? 'selected' : ''}>AM</option>
+                                    <option value="PM" ${(segment.startTime && (!segment.startTime.ampm || segment.startTime.ampm === 'PM')) ? 'selected' : ''}>PM</option>
+                                </select>
+                            </div>
+                            <div class="time-input-error" id="error-${index}"></div>
+                        </div>
+                        <div class="input-group">
+                            <label>Type:</label>
+                            <select onchange="toggleSegmentType(${index})">
+                                <option value="reading" ${!segment.isBreak ? 'selected' : ''}>Reading</option>
+                                <option value="break" ${segment.isBreak ? 'selected' : ''}>Break</option>
+                            </select>
+                        </div>
+                        <button class="btn-danger" onclick="removeSegment(${index})">Remove</button>
+                    </div>
+                ` : `
                     <div class="segment-label">Segment ${index + 1}: ${segment.isBreak ? 'Break' : 'Reading'}</div>
                     <div class="segment-inputs">
                         <div class="input-group">
@@ -733,12 +1171,30 @@
                 `;
                 container.appendChild(div);
                 
-                // Set values after elements are added to DOM (only if they're non-zero)
+                // Set values after elements are added to DOM
                 setTimeout(() => {
-                    if (hours > 0 || minutes > 0 || secs > 0) {
-                        document.getElementById(`hours-${index}`).value = hours > 0 ? hours.toString().padStart(2, '0') : '';
-                        document.getElementById(`minutes-${index}`).value = minutes > 0 ? minutes.toString().padStart(2, '0') : '';
-                        document.getElementById(`seconds-${index}`).value = secs > 0 ? secs.toString().padStart(2, '0') : '';
+                    if (timerState.inputMode === 'clock') {
+                        const st = segment.startTime || { hours: '', minutes: '', ampm: 'PM' };
+                        const hEl = document.getElementById(`clock-hours-${index}`);
+                        const mEl = document.getElementById(`clock-minutes-${index}`);
+                        const aEl = document.getElementById(`clock-ampm-${index}`);
+                        if (hEl) hEl.value = st.hours || '';
+                        if (mEl) mEl.value = st.minutes || '';
+                        if (aEl) aEl.value = st.ampm || 'PM';
+                    } else {
+                        // Convert seconds to HH, MM, SS for duration mode
+                        const hours = Math.floor(segment.duration / 3600);
+                        const minutes = Math.floor((segment.duration % 3600) / 60);
+                        const secs = segment.duration % 60;
+
+                        if (hours > 0 || minutes > 0 || secs > 0) {
+                            const hEl = document.getElementById(`hours-${index}`);
+                            const mEl = document.getElementById(`minutes-${index}`);
+                            const sEl = document.getElementById(`seconds-${index}`);
+                            if (hEl) hEl.value = hours > 0 ? hours.toString().padStart(2, '0') : '';
+                            if (mEl) mEl.value = minutes > 0 ? minutes.toString().padStart(2, '0') : '';
+                            if (sEl) sEl.value = secs > 0 ? secs.toString().padStart(2, '0') : '';
+                        }
                     }
                 }, 0);
             });
@@ -811,6 +1267,14 @@
         function startTimer() {
             timerState.totalPages = parseInt(document.getElementById('totalPages').value) || 604;
             timerState.originalTotalPages = timerState.totalPages;  // Store original
+
+            // Clock-time mode: build a system-time anchored schedule
+            if (timerState.inputMode === 'clock') {
+                if (!buildScheduleFromClockTimes()) {
+                    return;
+                }
+            }
+
             
             if (timerState.timeline.length === 0) {
                 alert('Please add at least one segment to the timeline.');
@@ -844,6 +1308,24 @@
             timerState.lastTickTime = Date.now();
             timerState.actualElapsedReadingTime = 0;
 
+            if (timerState.inputMode === 'clock') {
+                // In clock mode, page pacing starts from the first scheduled start time
+                timerState.rateResetAbsMs = timerState.scheduleStartsAbsMs ? timerState.scheduleStartsAbsMs[0] : null;
+
+                const effectiveNow = getEffectiveNowMs();
+                timerState.waitingToStart = (timerState.scheduleStartsAbsMs && effectiveNow < timerState.scheduleStartsAbsMs[0]);
+
+                // Immediately sync to the correct segment if user starts late
+                if (!timerState.waitingToStart) {
+                    syncClockModeToNow(true);
+                } else {
+                    // Waiting state: show countdown until first start
+                    timerState.currentSegmentIndex = 0;
+                    timerState.segmentTimeRemaining = Math.max(0, (timerState.scheduleStartsAbsMs[0] - effectiveNow) / 1000);
+                    timerState.currentPage = 1;
+                }
+            }
+
             saveState();
             showTimerScreen();
             startTimerLoop();
@@ -870,7 +1352,84 @@
             }, 100); // Update every 100ms for smooth display
         }
 
-        function tick() {
+        
+        function shiftScheduleFromIndex(startIndex, deltaMs) {
+            if (!timerState.scheduleStartsAbsMs || !timerState.scheduleFinishAbsMs) return;
+            for (let i = startIndex; i < timerState.scheduleStartsAbsMs.length; i++) {
+                timerState.scheduleStartsAbsMs[i] += deltaMs;
+            }
+            timerState.scheduleFinishAbsMs += deltaMs;
+            syncDurationsFromSchedule();
+        }
+
+        function syncClockModeToNow(allowPageAdvance) {
+            if (timerState.inputMode !== 'clock') return;
+            if (!timerState.scheduleStartsAbsMs || !timerState.scheduleFinishAbsMs) return;
+
+            const effectiveNow = getEffectiveNowMs();
+
+            const idx = findSegmentIndexForTime(effectiveNow);
+            if (idx === -1) {
+                timerState.waitingToStart = true;
+                timerState.currentSegmentIndex = 0;
+                timerState.segmentTimeRemaining = Math.max(0, (timerState.scheduleStartsAbsMs[0] - effectiveNow) / 1000);
+                timerState.currentPage = 1;
+                return;
+            }
+            if (idx >= timerState.timeline.length) {
+                completeTimer();
+                return;
+            }
+
+            timerState.waitingToStart = false;
+            timerState.currentSegmentIndex = idx;
+
+            const end = getSegmentEndMs(idx);
+            timerState.segmentTimeRemaining = Math.max(0, (end - effectiveNow) / 1000);
+
+            // Page counter in clock mode: based on reading-time elapsed since rateResetAbsMs
+            const rateStart = timerState.rateResetAbsMs ?? timerState.scheduleStartsAbsMs[0];
+            const readingElapsed = getReadingElapsedSecondsBetween(rateStart, effectiveNow);
+
+            const secondsPerPage = timerState.totalReadingTime / timerState.totalPages;
+            const basePageNumber = timerState.originalTotalPages - timerState.totalPages;
+            const pagesProgressed = Math.floor(readingElapsed / secondsPerPage);
+            const calculatedPage = Math.min(basePageNumber + pagesProgressed, timerState.originalTotalPages);
+
+            if (allowPageAdvance) {
+                timerState.currentPage = Math.max(timerState.currentPage, calculatedPage);
+            } else {
+                // preserve
+                timerState.currentPage = timerState.currentPage;
+            }
+        }
+
+function tick() {
+            const systemNow = Date.now();
+            const expectedDeltaMs = 100; // our interval is 100ms
+            applyClockJumpWarning(systemNow, expectedDeltaMs);
+
+            if (timerState.inputMode === 'clock') {
+                // Clock mode: derive everything from system time (effectiveNow)
+                // When waiting to start, show countdown until the first start
+                const effectiveNow = getEffectiveNowMs();
+
+                if (timerState.scheduleStartsAbsMs && effectiveNow < timerState.scheduleStartsAbsMs[0]) {
+                    timerState.waitingToStart = true;
+                    timerState.currentSegmentIndex = 0;
+                    timerState.segmentTimeRemaining = Math.max(0, (timerState.scheduleStartsAbsMs[0] - effectiveNow) / 1000);
+                    timerState.currentPage = 1;
+                } else {
+                    // Sync to schedule
+                    syncClockModeToNow(true);
+                }
+
+                updateDisplay();
+                saveState();
+                return;
+            }
+
+            // Duration mode (original behavior)
             const now = Date.now();
             const elapsed = (now - timerState.lastTickTime) / 1000;
             timerState.lastTickTime = now;
@@ -882,9 +1441,9 @@
             if (!currentSegment.isBreak) {
                 // Increment actual elapsed reading time
                 timerState.actualElapsedReadingTime += elapsed;
-                
+
                 const secondsPerPage = timerState.totalReadingTime / timerState.totalPages;
-                
+
                 // Calculate page progress from the base (after adjustments, we reset to current page)
                 // We need to figure out what our base page is
                 const basePageNumber = timerState.originalTotalPages - timerState.totalPages;
@@ -893,7 +1452,7 @@
                     basePageNumber + pagesProgressed,
                     timerState.originalTotalPages
                 );
-                
+
                 // Only update if calculated page is higher (prevents going backwards after adjustments)
                 if (calculatedPage > timerState.currentPage) {
                     timerState.currentPage = calculatedPage;
@@ -903,13 +1462,13 @@
             // Move to next segment if current one is finished
             if (timerState.segmentTimeRemaining <= 0) {
                 timerState.currentSegmentIndex++;
-                
+
                 if (timerState.currentSegmentIndex >= timerState.timeline.length) {
                     // Timer completed
                     completeTimer();
                     return;
                 }
-                
+
                 timerState.segmentTimeRemaining = timerState.timeline[timerState.currentSegmentIndex].duration;
             }
 
@@ -950,6 +1509,10 @@
                 statusIndicator.textContent = 'Paused';
                 statusIndicator.className = 'status-indicator status-paused';
                 pauseBtn.textContent = 'Resume';
+            } else if (timerState.inputMode === 'clock' && timerState.waitingToStart) {
+                statusIndicator.textContent = 'Waiting to Start';
+                statusIndicator.className = 'status-indicator status-paused';
+                pauseBtn.textContent = 'Pause';
             } else if (currentSegment.isBreak) {
                 statusIndicator.textContent = 'Break Time';
                 statusIndicator.className = 'status-indicator status-break';
@@ -992,76 +1555,106 @@
             const progressBar = document.getElementById('progressBar');
             const progressIndicator = document.getElementById('progressIndicator');
             const progressCompletedOverlay = document.getElementById('progressCompletedOverlay');
+
             const totalDuration = timerState.timeline.reduce((sum, seg) => sum + seg.duration, 0);
-            
-            // Calculate elapsed time
+
             let elapsedTime = 0;
-            for (let i = 0; i < timerState.currentSegmentIndex; i++) {
-                elapsedTime += timerState.timeline[i].duration;
+
+            if (timerState.inputMode === 'clock' && timerState.scheduleStartsAbsMs && timerState.scheduleFinishAbsMs) {
+                const effectiveNow = getEffectiveNowMs();
+                const start0 = timerState.scheduleStartsAbsMs[0];
+                const endAll = timerState.scheduleFinishAbsMs;
+                if (effectiveNow <= start0) {
+                    elapsedTime = 0;
+                } else if (effectiveNow >= endAll) {
+                    elapsedTime = totalDuration;
+                } else {
+                    elapsedTime = (effectiveNow - start0) / 1000; // seconds
+                }
+            } else {
+                // Duration mode: Calculate elapsed time based on segment progress
+                for (let i = 0; i < timerState.currentSegmentIndex; i++) {
+                    elapsedTime += timerState.timeline[i].duration;
+                }
+                const currentSegmentElapsed = timerState.timeline[timerState.currentSegmentIndex].duration - timerState.segmentTimeRemaining;
+                elapsedTime += currentSegmentElapsed;
             }
-            // Add elapsed time in current segment
-            const currentSegmentElapsed = timerState.timeline[timerState.currentSegmentIndex].duration - timerState.segmentTimeRemaining;
-            elapsedTime += currentSegmentElapsed;
-            
-            const progressPercentage = (elapsedTime / totalDuration) * 100;
-            
+
+            const progressPercentage = totalDuration > 0 ? (elapsedTime / totalDuration) * 100 : 0;
+
             // Build segments HTML (only once or when timeline changes)
             if (!progressBar.hasAttribute('data-initialized')) {
-                let html = '';
-                
-                timerState.timeline.forEach((segment, index) => {
-                    const percentage = (segment.duration / totalDuration) * 100;
+                let htmlSegs = '';
+                timerState.timeline.forEach((segment) => {
+                    const percentage = totalDuration > 0 ? (segment.duration / totalDuration) * 100 : 0;
                     const segmentClass = segment.isBreak ? 'break' : 'reading';
-                    
-                    html += `<div class="progress-segment ${segmentClass}" style="width: ${percentage}%"></div>`;
+                    htmlSegs += `<div class="progress-segment ${segmentClass}" style="width: ${percentage}%"></div>`;
                 });
-                
-                // Insert segments, then overlay, then indicator
+
                 const tempDiv = document.createElement('div');
-                tempDiv.innerHTML = html;
-                
-                // Clear and rebuild
+                tempDiv.innerHTML = htmlSegs;
+
                 progressBar.innerHTML = '';
                 while (tempDiv.firstChild) {
                     progressBar.appendChild(tempDiv.firstChild);
                 }
                 progressBar.appendChild(progressCompletedOverlay);
                 progressBar.appendChild(progressIndicator);
-                
+
                 progressBar.setAttribute('data-initialized', 'true');
             }
-            
-            // Update the completed overlay width (this dims and adds stripes to everything behind the line)
-            progressCompletedOverlay.style.width = `${progressPercentage}%`;
-            
-            // Position the indicator line
-            progressIndicator.style.left = `${progressPercentage}%`;
+
+            progressCompletedOverlay.style.width = `${Math.max(0, Math.min(100, progressPercentage))}%`;
+            progressIndicator.style.left = `${Math.max(0, Math.min(100, progressPercentage))}%`;
         }
 
         function updateMiniClocks() {
-            // Calculate reading time remaining
             let readingTimeRemaining = 0;
-            const currentSegment = timerState.timeline[timerState.currentSegmentIndex];
-            
-            // Add current segment if it's reading
-            if (!currentSegment.isBreak) {
-                readingTimeRemaining += timerState.segmentTimeRemaining;
-            }
-            
-            // Add future reading segments
-            for (let i = timerState.currentSegmentIndex + 1; i < timerState.timeline.length; i++) {
-                if (!timerState.timeline[i].isBreak) {
-                    readingTimeRemaining += timerState.timeline[i].duration;
+            let totalTimeRemaining = 0;
+
+            if (timerState.inputMode === 'clock' && timerState.scheduleStartsAbsMs && timerState.scheduleFinishAbsMs) {
+                const effectiveNow = getEffectiveNowMs();
+
+                // Total time remaining: from now to finish (never negative)
+                totalTimeRemaining = Math.max(0, (timerState.scheduleFinishAbsMs - effectiveNow) / 1000);
+
+                // Reading time remaining: sum remaining parts of reading segments from now to finish
+                for (let i = 0; i < timerState.timeline.length; i++) {
+                    if (timerState.timeline[i].isBreak) continue;
+                    const segStart = timerState.scheduleStartsAbsMs[i];
+                    const segEnd = getSegmentEndMs(i);
+
+                    const a = Math.max(effectiveNow, segStart);
+                    const b = segEnd;
+                    if (b > a) readingTimeRemaining += (b - a) / 1000;
+                }
+
+                // If waiting to start, clamp reading remaining to full remaining reading time (already handled above)
+                if (effectiveNow < timerState.scheduleStartsAbsMs[0]) {
+                    readingTimeRemaining = timerState.timeline
+                        .filter(s => !s.isBreak)
+                        .reduce((sum, s) => sum + s.duration, 0);
+                }
+            } else {
+                // Duration mode (original behavior)
+                const currentSegment = timerState.timeline[timerState.currentSegmentIndex];
+
+                if (!currentSegment.isBreak) {
+                    readingTimeRemaining += timerState.segmentTimeRemaining;
+                }
+
+                for (let i = timerState.currentSegmentIndex + 1; i < timerState.timeline.length; i++) {
+                    if (!timerState.timeline[i].isBreak) {
+                        readingTimeRemaining += timerState.timeline[i].duration;
+                    }
+                }
+
+                totalTimeRemaining = timerState.segmentTimeRemaining;
+                for (let i = timerState.currentSegmentIndex + 1; i < timerState.timeline.length; i++) {
+                    totalTimeRemaining += timerState.timeline[i].duration;
                 }
             }
 
-            // Calculate total time remaining
-            let totalTimeRemaining = timerState.segmentTimeRemaining;
-            for (let i = timerState.currentSegmentIndex + 1; i < timerState.timeline.length; i++) {
-                totalTimeRemaining += timerState.timeline[i].duration;
-            }
-
-            // Format and display
             document.getElementById('readingTimeRemaining').textContent = formatTime(Math.ceil(readingTimeRemaining));
             document.getElementById('totalTimeRemaining').textContent = formatTime(Math.ceil(totalTimeRemaining));
         }
@@ -1074,6 +1667,31 @@
         }
 
         function togglePause() {
+            if (timerState.inputMode === 'clock') {
+                // Clock mode pause is a meaningful hold: shift schedule forward by paused duration.
+                timerState.isPaused = !timerState.isPaused;
+
+                if (timerState.isPaused) {
+                    timerState.pausedAtSystemMs = Date.now();
+                } else {
+                    const resumeNow = Date.now();
+                    const pausedFor = timerState.pausedAtSystemMs ? (resumeNow - timerState.pausedAtSystemMs) : 0;
+                    timerState.scheduleOffsetMs = (timerState.scheduleOffsetMs || 0) + pausedFor;
+                    timerState.pausedAtSystemMs = null;
+
+                    // Prevent a jump in duration-mode tick logic (not used here, but keep consistent)
+                    timerState.lastTickTime = Date.now();
+
+                    // Re-sync immediately
+                    syncClockModeToNow(false);
+                }
+
+                updateDisplay();
+                saveState();
+                return;
+            }
+
+            // Duration mode (original)
             timerState.isPaused = !timerState.isPaused;
             if (!timerState.isPaused) {
                 timerState.lastTickTime = Date.now();
@@ -1159,148 +1777,242 @@
         function adjustTime(action) {
             const adjustSeconds = validateAdjustTime();
             if (adjustSeconds === null) return;
-            
+
             const actionText = action === 'add' ? 'add' : 'subtract';
             const timeStr = formatTime(adjustSeconds);
-            
-            // Store current page before adjustment
+
+            // Preserve current page before adjustment
             const preservedPage = timerState.currentPage;
-            
-            // Use setTimeout to prevent confirm from blocking timer
+
             setTimeout(() => {
                 if (!confirm(`Are you sure you want to ${actionText} ${timeStr} ${action === 'add' ? 'to' : 'from'} the current segment?`)) {
                     return;
                 }
-                
-                // Store current page before adjustment
-                const preservedPage = timerState.currentPage;
-                
-                // Adjust the current segment time
+
+                // Clock mode: shift schedule (meaningful adjustment)
+                if (timerState.inputMode === 'clock') {
+                    if (!timerState.scheduleStartsAbsMs || !timerState.scheduleFinishAbsMs) return;
+
+                    // Ensure we're synced to "now" first
+                    syncClockModeToNow(false);
+
+                    const idx = timerState.currentSegmentIndex;
+                    const deltaMs = (action === 'add' ? 1 : -1) * adjustSeconds * 1000;
+
+                    // Current segment is [start, end). We adjust its END by shifting everything after it.
+                    const start = timerState.scheduleStartsAbsMs[idx];
+                    const oldEnd = getSegmentEndMs(idx);
+                    const newEnd = oldEnd + deltaMs;
+
+                    // If subtract makes segment non-positive, advance to next segment instead
+                    if (newEnd <= start + 1000) {
+                        // Equivalent to skipping to next segment
+                        skipToNextSegmentInternal(preservedPage);
+                        closeAdjustTimeOverlay();
+                        return;
+                    }
+
+                    // Shift all future segment starts and finish by deltaMs
+                    shiftScheduleFromIndex(idx + 1, deltaMs);
+
+                    // Keep rate pacing consistent with preserve-page approach:
+                    // Recompute remaining reading time and pages remaining, then reset rateResetAbsMs to now.
+                    const effectiveNow = getEffectiveNowMs();
+                    const pagesRemaining = timerState.originalTotalPages - preservedPage;
+
+                    // Remaining reading time from now to finish (seconds)
+                    let remainingReadingSeconds = 0;
+                    for (let i = 0; i < timerState.timeline.length; i++) {
+                        if (timerState.timeline[i].isBreak) continue;
+                        const segStart = timerState.scheduleStartsAbsMs[i];
+                        const segEnd = getSegmentEndMs(i);
+                        const a = Math.max(effectiveNow, segStart);
+                        const b = segEnd;
+                        if (b > a) remainingReadingSeconds += (b - a) / 1000;
+                    }
+
+                    timerState.totalReadingTime = remainingReadingSeconds;
+                    timerState.totalPages = Math.max(1, pagesRemaining);
+                    timerState.rateResetAbsMs = effectiveNow;
+                    timerState.currentPage = preservedPage;
+
+                    // Re-sync view (but do not advance page during this sync)
+                    syncClockModeToNow(false);
+
+                    // Force progress bar rebuild
+                    const progressBar = document.getElementById('progressBar');
+                    if (progressBar) progressBar.removeAttribute('data-initialized');
+
+                    updateDisplay();
+                    saveState();
+                    closeAdjustTimeOverlay();
+                    return;
+                }
+
+                // Duration mode (original behavior)
+                const preservedPage2 = timerState.currentPage;
+
                 if (action === 'add') {
                     timerState.segmentTimeRemaining += adjustSeconds;
                     timerState.timeline[timerState.currentSegmentIndex].duration += adjustSeconds;
                 } else {
                     timerState.segmentTimeRemaining -= adjustSeconds;
                     timerState.timeline[timerState.currentSegmentIndex].duration -= adjustSeconds;
-                    
-                    // If time goes negative or zero, move to next segment
+
                     if (timerState.segmentTimeRemaining <= 0) {
                         timerState.currentSegmentIndex++;
-                        
+
                         if (timerState.currentSegmentIndex >= timerState.timeline.length) {
                             completeTimer();
                             closeAdjustTimeOverlay();
                             return;
                         }
-                        
+
                         timerState.segmentTimeRemaining = timerState.timeline[timerState.currentSegmentIndex].duration;
                     }
                 }
-                
-                // Calculate remaining reading time from current position onwards
+
                 let remainingReadingTime = 0;
                 const currentSegment = timerState.timeline[timerState.currentSegmentIndex];
-                
-                // Add remaining time in current segment if it's reading
+
                 if (!currentSegment.isBreak) {
                     remainingReadingTime += timerState.segmentTimeRemaining;
                 }
-                
-                // Add all future reading segments
+
                 for (let i = timerState.currentSegmentIndex + 1; i < timerState.timeline.length; i++) {
                     if (!timerState.timeline[i].isBreak) {
                         remainingReadingTime += timerState.timeline[i].duration;
                     }
                 }
-                
-                // Calculate pages remaining (use originalTotalPages, not totalPages)
-                const pagesRemaining = timerState.originalTotalPages - preservedPage;
-                
-                // Calculate new rate: remaining reading time / pages remaining
-                // The tick function will use: page = floor(actualElapsedReadingTime / secondsPerPage) + preservedPage
-                // So we set totalReadingTime and totalPages such that the rate works out
+
+                const pagesRemaining2 = timerState.originalTotalPages - preservedPage2;
+
                 timerState.totalReadingTime = remainingReadingTime;
-                timerState.totalPages = pagesRemaining;
-                
-                // Reset actualElapsedReadingTime to 0 (starting fresh from preserved page)
+                timerState.totalPages = pagesRemaining2;
+
                 timerState.actualElapsedReadingTime = 0;
-                
-                // Restore the preserved page
-                timerState.currentPage = preservedPage;
-                
-                // Force progress bar rebuild
-                const progressBar = document.getElementById('progressBar');
-                if (progressBar) {
-                    progressBar.removeAttribute('data-initialized');
+                timerState.currentPage = preservedPage2;
+
+                const progressBar2 = document.getElementById('progressBar');
+                if (progressBar2) {
+                    progressBar2.removeAttribute('data-initialized');
                 }
-                
-                // Update display
+
                 updateDisplay();
                 saveState();
-                
+
                 closeAdjustTimeOverlay();
             }, 0);
         }
 
+        function skipToNextSegmentInternal(preservedPage) {
+            if (!timerState.scheduleStartsAbsMs || !timerState.scheduleFinishAbsMs) return;
+
+            const effectiveNow = getEffectiveNowMs();
+            const idx = findSegmentIndexForTime(effectiveNow);
+
+            if (idx === -1) {
+                // If waiting, jump to first segment
+                const delta = timerState.scheduleStartsAbsMs[0] - effectiveNow;
+                timerState.scheduleOffsetMs = (timerState.scheduleOffsetMs || 0) - delta;
+            } else if (idx >= timerState.timeline.length) {
+                completeTimer();
+                return;
+            } else {
+                const nextIdx = idx + 1;
+                if (nextIdx >= timerState.timeline.length) {
+                    completeTimer();
+                    return;
+                }
+                const nextStart = timerState.scheduleStartsAbsMs[nextIdx];
+                const delta = nextStart - effectiveNow;
+                // Shift effective time forward to next start immediately
+                timerState.scheduleOffsetMs = (timerState.scheduleOffsetMs || 0) - delta;
+            }
+
+            const newEffectiveNow = getEffectiveNowMs();
+
+            // Recompute remaining reading pacing based on preserved page
+            const pagesRemaining = timerState.originalTotalPages - preservedPage;
+
+            let remainingReadingSeconds = 0;
+            for (let i = 0; i < timerState.timeline.length; i++) {
+                if (timerState.timeline[i].isBreak) continue;
+                const segStart = timerState.scheduleStartsAbsMs[i];
+                const segEnd = getSegmentEndMs(i);
+                const a = Math.max(newEffectiveNow, segStart);
+                const b = segEnd;
+                if (b > a) remainingReadingSeconds += (b - a) / 1000;
+            }
+
+            timerState.totalReadingTime = remainingReadingSeconds;
+            timerState.totalPages = Math.max(1, pagesRemaining);
+            timerState.rateResetAbsMs = newEffectiveNow;
+            timerState.currentPage = preservedPage;
+
+            syncClockModeToNow(false);
+        }
+
         function skipToNextSegment() {
-            // Store current page before adjustment
             const preservedPage = timerState.currentPage;
-            
-            // Use setTimeout to prevent confirm from blocking timer
+
             setTimeout(() => {
                 if (!confirm('Are you sure you want to skip to the next segment?')) {
                     return;
                 }
-                
+
+                if (timerState.inputMode === 'clock') {
+                    skipToNextSegmentInternal(preservedPage);
+
+                    const progressBar = document.getElementById('progressBar');
+                    if (progressBar) progressBar.removeAttribute('data-initialized');
+
+                    updateDisplay();
+                    saveState();
+                    closeAdjustTimeOverlay();
+                    return;
+                }
+
+                // Duration mode (original)
                 timerState.currentSegmentIndex++;
-                
+
                 if (timerState.currentSegmentIndex >= timerState.timeline.length) {
                     completeTimer();
                     closeAdjustTimeOverlay();
                     return;
                 }
-                
+
                 timerState.segmentTimeRemaining = timerState.timeline[timerState.currentSegmentIndex].duration;
-                
-                // Calculate remaining reading time from current position onwards
+
                 let remainingReadingTime = 0;
                 const currentSegment = timerState.timeline[timerState.currentSegmentIndex];
-                
-                // Add remaining time in current segment if it's reading
+
                 if (!currentSegment.isBreak) {
                     remainingReadingTime += timerState.segmentTimeRemaining;
                 }
-                
-                // Add all future reading segments
+
                 for (let i = timerState.currentSegmentIndex + 1; i < timerState.timeline.length; i++) {
                     if (!timerState.timeline[i].isBreak) {
                         remainingReadingTime += timerState.timeline[i].duration;
                     }
                 }
-                
-                // Calculate pages remaining (use originalTotalPages)
+
                 const pagesRemaining = timerState.originalTotalPages - preservedPage;
-                
-                // Update rate calculation variables
+
                 timerState.totalReadingTime = remainingReadingTime;
                 timerState.totalPages = pagesRemaining;
-                
-                // Reset actualElapsedReadingTime to 0 (starting fresh from preserved page)
+
                 timerState.actualElapsedReadingTime = 0;
-                
-                // Preserve the current page
                 timerState.currentPage = preservedPage;
-                
-                // Force progress bar rebuild
+
                 const progressBar = document.getElementById('progressBar');
                 if (progressBar) {
                     progressBar.removeAttribute('data-initialized');
                 }
-                
-                // Update display
+
                 updateDisplay();
                 saveState();
-                
+
                 closeAdjustTimeOverlay();
             }, 0);
         }
@@ -1313,6 +2025,9 @@
             const saved = localStorage.getItem('quranKhatmahState');
             if (saved) {
                 const loaded = JSON.parse(saved);
+                if (loaded.inputMode) timerState.inputMode = loaded.inputMode;
+                if (loaded.finishTime) timerState.finishTime = loaded.finishTime;
+
                 // Only restore if timer was running
                 if (loaded.isRunning) {
                     timerState = loaded;
