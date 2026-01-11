@@ -5,12 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Quran Testing App</title>
     <style>
-        @font-face {
-            font-family: 'p1-v1';
-            src: url('https://static-cdn.tarteel.ai/qul/fonts/quran_fonts/v1/ttf.ttf');
-            font-display: swap;
-        }
-
         :root {
             --bg-primary: #f5f5f5;
             --bg-secondary: white;
@@ -286,7 +280,6 @@
 
         .phrase-display {
             font-size: 28px;
-            font-family: 'p1-v1', 'Traditional Arabic', 'Arabic Typesetting', 'Geeza Pro', 'Scheherazade New', 'Amiri', serif;
             text-align: center;
             padding: 30px;
             background: var(--bg-secondary);
@@ -307,7 +300,6 @@
 
         .answer-verse {
             font-size: 24px;
-            font-family: 'p1-v1', 'Traditional Arabic', 'Arabic Typesetting', 'Geeza Pro', 'Scheherazade New', 'Amiri', serif;
             direction: rtl;
             line-height: 2;
             margin-bottom: 15px;
@@ -535,17 +527,6 @@
                         </div>
                     </div>
                 </div>
-
-                <div class="control-group" style="margin-top: 20px;">
-                    <label><strong>Font Size:</strong></label>
-                    <div style="text-align: center; font-size: 14px; color: var(--text-tertiary); margin-bottom: 5px;">
-                        <span id="font-size-display">28px</span>
-                    </div>
-                    <input type="range" id="font-size-slider" min="16" max="48" value="28" style="width: 100%;">
-                    <div id="font-preview" style="font-family: 'p1-v1', 'Traditional Arabic', 'Arabic Typesetting', 'Geeza Pro', 'Scheherazade New', 'Amiri', serif; direction: rtl; text-align: center; margin-top: 10px; padding: 10px; background: var(--bg-tertiary); border-radius: 4px; font-size: 28px; transition: font-size 0.1s;">
-                        بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ
-                    </div>
-                </div>
             </div>
 
             <div class="button-group">
@@ -581,7 +562,6 @@
         let metadata = null;
         let currentQuestion = null;
         let displayedWords = [];
-        let currentFontSize = 28; // Default font size in px
 
         // Load CSV file
         async function loadCSV() {
@@ -745,27 +725,6 @@
                     } else {
                         lengthInputs.style.display = 'none';
                     }
-                });
-
-                // Font size slider
-                const fontSizeSlider = document.getElementById('font-size-slider');
-                const fontSizeDisplay = document.getElementById('font-size-display');
-                const fontPreview = document.getElementById('font-preview');
-                
-                fontSizeSlider.addEventListener('input', (e) => {
-                    currentFontSize = parseInt(e.target.value);
-                    const size = currentFontSize + 'px';
-                    fontSizeDisplay.textContent = size;
-                    fontPreview.style.fontSize = size;
-                    
-                    // Update all existing Arabic text elements (phrase and answer verses)
-                    const phraseDisplay = document.getElementById('phrase-display');
-                    if (phraseDisplay) {
-                        phraseDisplay.style.fontSize = size;
-                    }
-                    document.querySelectorAll('.answer-verse').forEach(el => {
-                        el.style.fontSize = size;
-                    });
                 });
 
                 document.getElementById('loading').style.display = 'none';
@@ -1205,7 +1164,6 @@
         // Display the current phrase
         function displayPhrase() {
             const phraseDiv = document.getElementById('phrase-display');
-            phraseDiv.style.fontSize = currentFontSize + 'px'; // Apply current font size
             const showAyahMarker = document.getElementById('show-ayah-marker').checked;
             
             if (!showAyahMarker) {
@@ -1297,7 +1255,6 @@
 
                 const verseDiv = document.createElement('div');
                 verseDiv.className = 'answer-verse';
-                verseDiv.style.fontSize = currentFontSize + 'px'; // Apply current font size
                 verseDiv.textContent = verseText;
                 answerDiv.appendChild(verseDiv);
             });
