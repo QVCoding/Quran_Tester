@@ -20,3 +20,6 @@ Run `make_quran_words.py`, then convert the resulting file to csv.
 
  `khatmahclock.html` App which has a countdown for Quran Khatmas - showing what page the reciter must be up to to finish on time.
  Potential updates: Use ayah timing data from qul.ai to show the exact ayah to keep pace.
+
+---
+The code itself is primarily AI-written, but AI did not generate any of the actual Quranic text whatsoever.
