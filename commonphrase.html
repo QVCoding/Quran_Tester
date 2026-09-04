@@ -1,0 +1,1111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Common Phrase Finder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400&amp;family=Spectral:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#101a16;
+    --panel:#17241f;
+    --panel-alt:#1e2f28;
+    --border:#2c3d35;
+    --text:#ede6d6;
+    --text-muted:#93a89b;
+    --accent:#c9a15a;
+    --accent-soft:rgba(201,161,90,0.16);
+    --highlight-bg:#4a3a1c;
+    --highlight-text:#f3d9a4;
+    --danger:#c96a5a;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.5;
+    padding:2.5rem 1.25rem 5rem;
+  }
+  #app{max-width:700px;margin:0 auto;}
+  header{margin-bottom:2rem;border-bottom:1px solid var(--border);padding-bottom:1.25rem;}
+  #top-actions{display:flex;justify-content:center;align-items:center;gap:0.75rem;flex-wrap:wrap;margin-bottom:2rem;}
+  h1{
+    font-family:"Spectral",Georgia,serif;
+    font-weight:600;
+    font-size:1.75rem;
+    margin:0 0 0.35rem;
+    color:var(--text);
+  }
+  header p{margin:0;color:var(--text-muted);font-size:0.95rem;}
+
+  h2{
+    font-family:"Spectral",Georgia,serif;
+    font-weight:500;
+    font-size:1.15rem;
+    margin:0 0 0.9rem;
+    color:var(--text);
+  }
+
+  section{margin-bottom:1.75rem;}
+
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:4px;
+    padding:1.5rem;
+  }
+
+  .status{
+    padding:0.85rem 1rem;
+    border:1px solid var(--border);
+    border-radius:4px;
+    background:var(--panel);
+    color:var(--text-muted);
+    font-size:0.9rem;
+    margin-bottom:1.5rem;
+  }
+  .status.error{border-color:var(--danger);color:var(--danger);}
+  .status.hidden{display:none;}
+
+  .field{margin-bottom:1.35rem;}
+  .field:last-child{margin-bottom:0;}
+  .field-label{
+    display:block;
+    font-size:0.9rem;
+    font-weight:600;
+    margin-bottom:0.4rem;
+    color:var(--text);
+  }
+  .field-help{font-size:0.82rem;color:var(--text-muted);margin:0.3rem 0 0;}
+  .field-error{font-size:0.82rem;color:var(--danger);margin:0.35rem 0 0;}
+  .field-error:empty{display:none;}
+
+  .range-row{display:flex;gap:1rem;align-items:center;flex-wrap:wrap;}
+  .range-row label{font-size:0.85rem;color:var(--text-muted);display:flex;align-items:center;gap:0.5rem;}
+  input[type="number"], input[type="text"]{
+    background:var(--panel-alt);
+    border:1px solid var(--border);
+    color:var(--text);
+    border-radius:3px;
+    padding:0.45rem 0.6rem;
+    font-size:0.95rem;
+    width:5.5rem;
+  }
+  input[type="text"].wide{width:100%;}
+  input:focus{outline:2px solid var(--accent);outline-offset:1px;}
+
+  .tabs{display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem;border-bottom:1px solid var(--border);}
+  .tab-btn{
+    background:none;border:none;color:var(--text-muted);
+    padding:0.5rem 0.1rem;margin-right:0.75rem;
+    font-size:0.92rem;cursor:pointer;border-bottom:2px solid transparent;
+  }
+  .tab-btn.active{color:var(--text);border-bottom-color:var(--accent);}
+  .tab-panel{display:none;}
+  .tab-panel.active{display:block;}
+
+  .select-all-row{
+    display:flex;align-items:center;gap:0.5rem;
+    padding-bottom:0.6rem;margin-bottom:0.6rem;
+    border-bottom:1px solid var(--border);
+    font-size:0.88rem;color:var(--text-muted);
+  }
+  .checkbox-list{
+    max-height:220px;overflow-y:auto;
+    display:grid;grid-template-columns:1fr 1fr;gap:0.35rem 1rem;
+    padding-right:0.25rem;
+  }
+  .checkbox-list label{
+    display:flex;align-items:center;gap:0.5rem;
+    font-size:0.9rem;cursor:pointer;
+  }
+  .checkbox-list .arabic-name{font-family:"Amiri",serif;font-size:1.05rem;}
+  input[type="checkbox"]{accent-color:var(--accent);width:1rem;height:1rem;}
+
+  .btn{
+    font-family:inherit;font-size:0.95rem;
+    padding:0.65rem 1.3rem;border-radius:3px;
+    cursor:pointer;border:1px solid var(--border);
+    background:var(--panel-alt);color:var(--text);
+  }
+  .btn:hover{border-color:var(--accent);}
+  .btn-primary{background:var(--accent);color:#1a1408;border-color:var(--accent);font-weight:600;}
+  .btn-primary:hover{filter:brightness(1.08);}
+  .btn:disabled{opacity:0.5;cursor:not-allowed;}
+  .btn-row{display:flex;gap:0.75rem;flex-wrap:wrap;margin-top:1.5rem;}
+  #quiz-panel .btn-row{justify-content:center;}
+
+  .more-settings-toggle{
+    display:flex;align-items:center;gap:0.4rem;
+    background:none;border:none;color:var(--text-muted);
+    font-family:inherit;font-size:0.88rem;cursor:pointer;
+    padding:0.4rem 0;margin-bottom:0.5rem;
+  }
+  .more-settings-toggle:hover{color:var(--text);}
+  .more-settings-toggle .chevron{
+    display:inline-block;transition:transform 0.15s ease;
+    font-size:1.1rem;line-height:1;
+  }
+  .more-settings-toggle[aria-expanded="true"] .chevron{transform:rotate(90deg);}
+  #more-settings{
+    border-top:1px solid var(--border);
+    padding-top:1.35rem;margin-bottom:1.35rem;
+  }
+  #more-settings .field:last-child{margin-bottom:0;}
+
+  .segmented{display:inline-flex;border:1px solid var(--border);border-radius:4px;overflow:hidden;}
+  .segment-btn{
+    background:var(--panel-alt);border:none;color:var(--text-muted);
+    padding:0.45rem 1.15rem;font-size:0.88rem;font-family:inherit;cursor:pointer;
+  }
+  .segment-btn + .segment-btn{border-left:1px solid var(--border);}
+  .segment-btn.active{background:var(--accent);color:#1a1408;font-weight:600;}
+
+  .settings-status{font-size:0.88rem;color:var(--text-muted);margin:0 0 0.85rem;}
+  .settings-status.error{color:var(--danger);}
+  .settings-status:empty{display:none;}
+
+  .quiz-card{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:4px;
+    padding:2rem 1.75rem;
+    text-align:center;
+  }
+  .quiz-prompt{font-size:1rem;color:var(--text-muted);margin-bottom:0.5rem;}
+  .quiz-surahs{
+    font-family:"Amiri",serif;
+    font-size:1.6rem;
+    direction:rtl;
+    color:var(--text);
+    line-height:2;
+  }
+  .quiz-surahs.ltr-mode{
+    font-family:"Spectral",Georgia,serif;
+    font-size:1.3rem;
+    direction:ltr;
+  }
+  .quiz-meta{font-size:0.85rem;color:var(--text-muted);margin-top:0.75rem;}
+
+  .unit-heading{
+    text-align:center;
+    margin:1.3rem 0 0.7rem;
+  }
+  .unit-heading:first-child{margin-top:0;}
+  .unit-heading span{
+    display:inline-block;
+    font-family:"Spectral",Georgia,serif;
+    font-size:1.05rem;
+    font-weight:700;
+    letter-spacing:0.03em;
+    color:var(--accent);
+    border-bottom:2px solid var(--accent);
+    padding-bottom:0.2rem;
+  }
+
+  .phrase-block{
+    margin-bottom:1.25rem;
+    padding:1.35rem 1.1rem;
+    border:1px solid var(--border);
+    border-radius:6px;
+    background:var(--panel-alt);
+  }
+  .phrase-block:last-child{margin-bottom:0;}
+  .phrase-label{
+    display:inline-block;
+    font-size:0.72rem;
+    font-weight:700;
+    letter-spacing:0.07em;
+    text-transform:uppercase;
+    color:#1a1408;
+    background:var(--accent);
+    padding:0.3rem 0.85rem;
+    border-radius:999px;
+    margin:0 0 1rem;
+  }
+  .answer-phrase{
+    font-family:"Amiri",serif;
+    font-size:1.65rem;
+    direction:rtl;
+    text-align:center;
+    color:var(--highlight-text);
+    background:var(--highlight-bg);
+    border:2px solid var(--accent);
+    border-radius:6px;
+    padding:1.1rem 1.25rem;
+    margin:1.25rem 0 1.5rem;
+  }
+  .occurrence{
+    border-top:1px solid var(--border);
+    padding:1.1rem 0;
+  }
+  .occurrence:first-child{border-top:none;}
+  .occurrence-meta{
+    font-size:0.85rem;color:var(--text-muted);margin-bottom:0.5rem;
+    display:flex;gap:1rem;flex-wrap:wrap;
+  }
+  .occurrence-meta .surah-name{font-family:"Amiri",serif;font-size:1.1rem;font-weight:700;color:var(--accent);}
+  .ayah-text{
+    font-family:"Amiri",serif;
+    font-size:1.35rem;
+    direction:rtl;
+    text-align:right;
+    line-height:2.1;
+  }
+  .ayah-text mark{
+    background:var(--highlight-bg);
+    color:var(--highlight-text);
+    border-radius:3px;
+    padding:0 0.15rem;
+  }
+
+  .spinner-row{display:flex;align-items:center;gap:0.7rem;color:var(--text-muted);font-size:0.9rem;}
+  .spinner{
+    width:16px;height:16px;border-radius:50%;
+    border:2px solid var(--border);border-top-color:var(--accent);
+    animation:spin 0.8s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  [hidden]{display:none !important;}
+
+  @media (max-width:520px){
+    .checkbox-list{grid-template-columns:1fr;}
+    body{padding:1.75rem 0.85rem 4rem;}
+    .quiz-card{padding:1.5rem 1.1rem;}
+    .phrase-block{padding:1.1rem 0.8rem;}
+    .quiz-surahs{font-size:1.4rem;}
+    .answer-phrase{font-size:1.4rem;padding:0.9rem 0.9rem;}
+    .ayah-text{font-size:1.2rem;}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header>
+    <h1>Common Phrase Finder</h1>
+    <p>Finds phrases repeated word-for-word across different surahs. Page numbers are based on old Madinah Mushaf.</p>
+  </header>
+
+  <div id="top-actions" hidden>
+    <button type="button" class="btn" id="change-settings">Change settings</button>
+    <button type="button" class="btn btn-primary" id="new-question-top" hidden>New question</button>
+  </div>
+
+  <div id="status" class="status">Loading Qur'an data</div>
+
+  <section id="settings-panel" class="panel" hidden>
+    <h2>Settings</h2>
+
+    <div class="field">
+      <span class="field-label">Group Questions By</span>
+      <div class="segmented" id="group-by-toggle">
+        <button type="button" class="segment-btn active" data-groupby="sura">Surah</button>
+        <button type="button" class="segment-btn" data-groupby="juz">Juz</button>
+      </div>
+      <p class="field-help">Whether questions and answers are grouped by surah or by juz.</p>
+    </div>
+
+    <div class="field">
+      <span class="field-label">Portion to Test</span>
+      <div class="tabs">
+        <button type="button" class="tab-btn active" data-tab="surah">Surah Select</button>
+        <button type="button" class="tab-btn" data-tab="juz">Juz Select</button>
+        <button type="button" class="tab-btn" data-tab="page">Page Select</button>
+      </div>
+
+      <div class="tab-panel active" id="tab-surah">
+        <div class="select-all-row">
+          <input type="checkbox" id="surah-select-all" checked>
+          <label for="surah-select-all">Select all surahs</label>
+        </div>
+        <div class="checkbox-list" id="surah-list"></div>
+      </div>
+
+      <div class="tab-panel" id="tab-juz">
+        <div class="select-all-row">
+          <input type="checkbox" id="juz-select-all" checked>
+          <label for="juz-select-all">Select all juz</label>
+        </div>
+        <div class="checkbox-list" id="juz-list"></div>
+      </div>
+
+      <div class="tab-panel" id="tab-page">
+        <label class="field-label" for="page-ranges">Page ranges</label>
+        <input type="text" class="wide" id="page-ranges" placeholder="e.g. 1-100, 150-200">
+        <p class="field-help" id="page-ranges-help">Comma-separated page ranges. Leave blank to include every page.</p>
+        <p class="field-error" id="page-error"></p>
+      </div>
+    </div>
+
+    <button type="button" class="more-settings-toggle" id="more-settings-toggle" aria-expanded="false">
+      <span class="chevron" id="more-settings-chevron">&rsaquo;</span> More settings
+    </button>
+
+    <div id="more-settings" hidden>
+      <div class="field">
+        <span class="field-label">Phrase Length (no. of words)</span>
+        <div class="range-row">
+          <label>Min <input type="number" id="min-words" min="1" step="1" value="5"></label>
+          <label>Max <input type="number" id="max-words" min="1" step="1" value="8"></label>
+        </div>
+        <p class="field-help">Length of the common phrase.</p>
+        <p class="field-error" id="words-error"></p>
+      </div>
+
+      <div class="field">
+        <span class="field-label" id="unit-count-label">Number of Surahs the Phrase Appears In</span>
+        <div class="range-row">
+          <label>Min <input type="number" id="min-surahs" min="2" step="1" value="2"></label>
+          <label>Max <input type="number" id="max-surahs" min="2" step="1" value="10"></label>
+        </div>
+        <p class="field-help" id="unit-count-help">Only phrases that occur in this many distinct surahs will be used as questions.</p>
+        <p class="field-error" id="surahs-error"></p>
+      </div>
+
+      <div class="field">
+        <span class="field-label">Number of Similar Phrases</span>
+        <div class="range-row">
+          <label>Min <input type="number" id="min-similar" min="1" step="1" value="1"></label>
+          <label>Max <input type="number" id="max-similar" min="1" step="1" value="2"></label>
+        </div>
+        <p class="field-help" id="similar-help">How many different phrases are allowed to share the exact same set of surahs.</p>
+        <p class="field-error" id="similar-error"></p>
+      </div>
+    </div>
+
+    <p class="settings-status" id="settings-status"></p>
+    <div class="btn-row">
+      <button type="button" class="btn btn-primary" id="apply-settings">Begin Test</button>
+    </div>
+  </section>
+
+  <section id="quiz-panel" hidden>
+    <div class="quiz-card">
+      <div id="quiz-question">
+        <p class="quiz-prompt">This phrase(s) appears in:</p>
+        <p class="quiz-surahs" id="quiz-surah-names"></p>
+        <p class="quiz-meta" id="quiz-count-meta"></p>
+        <p class="quiz-meta" id="quiz-similar-meta" hidden></p>
+      </div>
+      <div id="quiz-answer" hidden>
+        <div id="answer-occurrences"></div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button type="button" class="btn btn-primary" id="reveal-answer">Reveal answer</button>
+      <button type="button" class="btn btn-primary" id="new-question" hidden>New question</button>
+    </div>
+  </section>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  const SQL_URL = "quran-simple-plain_nobasmalah.sql";
+  const XML_URL = "app_quran_metadata.xml";
+
+  // ---------- Global state ----------
+  let ayahs = [];           // [{sura, aya, page, juz, text, tokens}]
+  let suraMeta = new Map(); // sura index -> {name, ayas, start}
+  let suraOrder = [];       // sura indices in order
+  let juzCount = 0;
+  let pageCount = 0;
+
+  let phraseIndex = null;   // Map(phraseKey -> Map(sura -> occurrence))
+  let indexedMinWords = null;
+  let indexedMaxWords = null;
+
+  let pool = [];            // [{unitList:[...], phrases:[{phrase, occurrences:[...]}]}]
+  let currentQuestion = null;
+  let moreSettingsOpen = false;
+
+  // ---------- DOM refs ----------
+  const statusEl = document.getElementById("status");
+  const settingsPanel = document.getElementById("settings-panel");
+  const quizPanel = document.getElementById("quiz-panel");
+  const topActions = document.getElementById("top-actions");
+
+  // ---------- Status helper ----------
+  function setStatus(msg, isError){
+    stopStatusLoadingAnim();
+    statusEl.textContent = msg;
+    statusEl.classList.toggle("error", !!isError);
+    statusEl.classList.remove("hidden");
+  }
+  function hideStatus(){
+    stopStatusLoadingAnim();
+    statusEl.classList.add("hidden");
+  }
+
+  // Generic animated "Loading" / "Building..." indicator: cycles the trailing dots 1-2-3-1...
+  // so long-running steps don't look frozen. Returns a stop() function.
+  function startDotAnimation(el, baseText){
+    let n = 1;
+    el.textContent = baseText + ".";
+    const timer = setInterval(function(){
+      n = (n % 3) + 1;
+      el.textContent = baseText + ".".repeat(n);
+    }, 500);
+    return function stop(){ clearInterval(timer); };
+  }
+
+  let statusLoadingStop = null;
+  function setStatusLoading(baseText){
+    stopStatusLoadingAnim();
+    statusEl.classList.remove("error", "hidden");
+    statusLoadingStop = startDotAnimation(statusEl, baseText);
+  }
+  function stopStatusLoadingAnim(){
+    if(statusLoadingStop){ statusLoadingStop(); statusLoadingStop = null; }
+  }
+
+  let settingsLoadingStop = null;
+  function setSettingsStatusLoading(baseText){
+    stopSettingsLoadingAnim();
+    const el = document.getElementById("settings-status");
+    el.classList.remove("error");
+    settingsLoadingStop = startDotAnimation(el, baseText);
+  }
+  function stopSettingsLoadingAnim(){
+    if(settingsLoadingStop){ settingsLoadingStop(); settingsLoadingStop = null; }
+  }
+
+  // ---------- Load & parse ----------
+  async function loadData(){
+    let sqlText, xmlText;
+    try{
+      const [sqlResp, xmlResp] = await Promise.all([fetch(SQL_URL), fetch(XML_URL)]);
+      if(!sqlResp.ok) throw new Error("Could not fetch " + SQL_URL + " (HTTP " + sqlResp.status + ")");
+      if(!xmlResp.ok) throw new Error("Could not fetch " + XML_URL + " (HTTP " + xmlResp.status + ")");
+      sqlText = await sqlResp.text();
+      xmlText = await xmlResp.text();
+
+      const sqlRows = parseSQL(sqlText);
+      const meta = parseMetadataXML(xmlText);
+      buildAyahRecords(sqlRows, meta);
+    }catch(err){
+      console.error("Failed to load/parse Qur'an data:", err);
+      setStatus("Couldn't load Qur'an data. Please try refreshing the page.", true);
+      throw err;
+    }
+  }
+
+  function parseSQL(text){
+    // Matches tuples like: (6231, 114, 1, 'text with '' escaped quotes')
+    const rows = [];
+    const re = /\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*'((?:[^'\\]|\\.|'')*)'\s*\)/g;
+    let m;
+    while((m = re.exec(text)) !== null){
+      const sura = parseInt(m[2], 10);
+      const aya = parseInt(m[3], 10);
+      let t = m[4];
+      t = t.replace(/''/g, "'").replace(/\\'/g, "'");
+      rows.push({ sura: sura, aya: aya, text: t.trim() });
+    }
+    if(rows.length === 0){
+      throw new Error("No ayah rows could be parsed from " + SQL_URL + ". The file format may not match what this app expects.");
+    }
+    return rows;
+  }
+
+  function parseMetadataXML(text){
+    const doc = new DOMParser().parseFromString(text, "application/xml");
+    if(doc.querySelector("parsererror")){
+      throw new Error("Could not parse " + XML_URL + " as XML.");
+    }
+
+    const suras = [];
+    doc.querySelectorAll("suras > sura").forEach(function(el){
+      suras.push({
+        index: parseInt(el.getAttribute("index"), 10),
+        ayas: parseInt(el.getAttribute("ayas"), 10),
+        start: parseInt(el.getAttribute("start"), 10),
+        name: el.getAttribute("name")
+      });
+    });
+
+    const juzs = [];
+    doc.querySelectorAll("juzs > juz").forEach(function(el){
+      juzs.push({
+        index: parseInt(el.getAttribute("index"), 10),
+        sura: parseInt(el.getAttribute("sura"), 10),
+        aya: parseInt(el.getAttribute("aya"), 10)
+      });
+    });
+
+    const pages = [];
+    doc.querySelectorAll("pages > page").forEach(function(el){
+      pages.push({
+        index: parseInt(el.getAttribute("index"), 10),
+        sura: parseInt(el.getAttribute("sura"), 10),
+        aya: parseInt(el.getAttribute("aya"), 10)
+      });
+    });
+
+    if(suras.length === 0) throw new Error("No <sura> entries found in " + XML_URL + ".");
+    return { suras: suras, juzs: juzs, pages: pages };
+  }
+
+  // Convert sura+aya boundary markers into a sorted list of {start, index} by global 0-based ayah offset
+  function boundariesToGlobalStarts(boundaryList, suraStartMap){
+    return boundaryList
+      .map(function(b){ return { start: suraStartMap.get(b.sura) + (b.aya - 1), index: b.index }; })
+      .sort(function(a, b){ return a.start - b.start; });
+  }
+
+  // Given ayahs sorted by global index, and sorted boundary starts, assign boundary.index to each ayah
+  function assignByBoundary(sortedAyahs, sortedBoundaries, field){
+    let bi = 0;
+    for(let i = 0; i < sortedAyahs.length; i++){
+      while(bi + 1 < sortedBoundaries.length && sortedBoundaries[bi + 1].start <= sortedAyahs[i]._globalIdx){
+        bi++;
+      }
+      sortedAyahs[i][field] = sortedBoundaries.length ? sortedBoundaries[bi].index : null;
+    }
+  }
+
+  function buildAyahRecords(sqlRows, meta){
+    suraMeta = new Map();
+    suraOrder = [];
+    meta.suras.sort(function(a, b){ return a.index - b.index; });
+    meta.suras.forEach(function(s){
+      suraMeta.set(s.index, s);
+      suraOrder.push(s.index);
+    });
+
+    const suraStartMap = new Map();
+    meta.suras.forEach(function(s){ suraStartMap.set(s.index, s.start); });
+
+    ayahs = sqlRows.map(function(r){
+      const start = suraStartMap.get(r.sura);
+      if(start === undefined){
+        throw new Error("Sura " + r.sura + " found in " + SQL_URL + " has no matching entry in " + XML_URL + ".");
+      }
+      return {
+        sura: r.sura,
+        aya: r.aya,
+        text: r.text,
+        tokens: r.text.split(/\s+/).filter(Boolean),
+        _globalIdx: start + (r.aya - 1),
+        page: null,
+        juz: null
+      };
+    });
+
+    ayahs.sort(function(a, b){ return a._globalIdx - b._globalIdx; });
+
+    const juzBoundaries = boundariesToGlobalStarts(meta.juzs, suraStartMap);
+    const pageBoundaries = boundariesToGlobalStarts(meta.pages, suraStartMap);
+    assignByBoundary(ayahs, juzBoundaries, "juz");
+    assignByBoundary(ayahs, pageBoundaries, "page");
+
+    juzCount = juzBoundaries.length;
+    pageCount = pageBoundaries.length;
+
+    populateSettingsUI();
+  }
+
+  // ---------- Settings UI population ----------
+  function populateSettingsUI(){
+    const surahList = document.getElementById("surah-list");
+    surahList.innerHTML = "";
+    suraOrder.forEach(function(idx){
+      const s = suraMeta.get(idx);
+      const label = document.createElement("label");
+      label.innerHTML = '<input type="checkbox" class="surah-cb" value="' + idx + '" checked>' +
+        '<span class="arabic-name" dir="rtl">' + s.name + '</span>';
+      surahList.appendChild(label);
+    });
+
+    const juzList = document.getElementById("juz-list");
+    juzList.innerHTML = "";
+    for(let j = 1; j <= juzCount; j++){
+      const label = document.createElement("label");
+      label.innerHTML = '<input type="checkbox" class="juz-cb" value="' + j + '" checked>' +
+        '<span>Juz ' + j + '</span>';
+      juzList.appendChild(label);
+    }
+
+    document.getElementById("page-ranges-help").textContent =
+      "Comma-separated page ranges (1-" + pageCount + "). Leave blank to include every page.";
+
+    wireSelectAll("surah-select-all", "surah-cb");
+    wireSelectAll("juz-select-all", "juz-cb");
+    syncMoreSettingsUI();
+    updateUnitCountLabels();
+
+    hideStatus();
+    settingsPanel.hidden = false;
+  }
+
+  function wireSelectAll(allId, itemClass){
+    const allBox = document.getElementById(allId);
+    allBox.addEventListener("change", function(){
+      document.querySelectorAll("." + itemClass).forEach(function(cb){ cb.checked = allBox.checked; });
+    });
+    document.addEventListener("change", function(e){
+      if(e.target.classList.contains(itemClass)){
+        const all = document.querySelectorAll("." + itemClass);
+        const checked = document.querySelectorAll("." + itemClass + ":checked");
+        allBox.checked = (all.length === checked.length);
+      }
+    });
+  }
+
+  // ---------- Tabs ----------
+  document.querySelectorAll(".tab-btn").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      document.querySelectorAll(".tab-btn").forEach(function(b){ b.classList.remove("active"); });
+      document.querySelectorAll(".tab-panel").forEach(function(p){ p.classList.remove("active"); });
+      btn.classList.add("active");
+      document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
+    });
+  });
+
+  // ---------- More settings toggle ----------
+  function syncMoreSettingsUI(){
+    document.getElementById("more-settings").hidden = !moreSettingsOpen;
+    document.getElementById("more-settings-toggle").setAttribute("aria-expanded", moreSettingsOpen ? "true" : "false");
+  }
+  document.getElementById("more-settings-toggle").addEventListener("click", function(){
+    moreSettingsOpen = !moreSettingsOpen;
+    syncMoreSettingsUI();
+  });
+
+  // ---------- Group Questions By toggle ----------
+  function updateUnitCountLabels(){
+    const groupBy = getGroupByMode();
+    const unitWord = groupBy === "juz" ? "Juz" : "Surahs";
+    const unitWordLower = groupBy === "juz" ? "juz" : "surahs";
+    document.getElementById("unit-count-label").textContent = "Number of " + unitWord + " the Phrase Appears In";
+    document.getElementById("unit-count-help").textContent =
+      "Only phrases that occur in this many distinct " + unitWordLower + " will be used as questions.";
+    document.getElementById("similar-help").textContent =
+      "How many different phrases are allowed to share the exact same set of " + unitWordLower + ".";
+  }
+  document.querySelectorAll("#group-by-toggle .segment-btn").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      document.querySelectorAll("#group-by-toggle .segment-btn").forEach(function(b){ b.classList.remove("active"); });
+      btn.classList.add("active");
+      updateUnitCountLabels();
+    });
+  });
+
+  // ---------- Page range parsing ----------
+  function parsePageRanges(str){
+    str = str.trim();
+    if(str === "") return null; // null = no restriction
+    const pages = new Set();
+    const parts = str.split(",");
+    for(let part of parts){
+      part = part.trim();
+      if(part === "") continue;
+      const rangeMatch = part.match(/^(\d+)\s*-\s*(\d+)$/);
+      const singleMatch = part.match(/^(\d+)$/);
+      if(rangeMatch){
+        let a = parseInt(rangeMatch[1], 10), b = parseInt(rangeMatch[2], 10);
+        if(a > b){ const t = a; a = b; b = t; }
+        if(a < 1 || b > pageCount){
+          throw new Error("Pages must be between 1 and " + pageCount + ".");
+        }
+        for(let p = a; p <= b; p++) pages.add(p);
+      }else if(singleMatch){
+        const p = parseInt(singleMatch[1], 10);
+        if(p < 1 || p > pageCount){
+          throw new Error("Pages must be between 1 and " + pageCount + ".");
+        }
+        pages.add(p);
+      }else{
+        throw new Error('Could not understand page range "' + part + '". Use formats like "1-100" or "150".');
+      }
+    }
+    return pages;
+  }
+
+  // ---------- Build portion set (keys are "sura-aya") ----------
+  function buildPortionSet(){
+    const activeTab = document.querySelector(".tab-btn.active").dataset.tab;
+    const set = new Set();
+
+    if(activeTab === "surah"){
+      const chosen = new Set(Array.from(document.querySelectorAll(".surah-cb:checked")).map(function(cb){ return parseInt(cb.value, 10); }));
+      ayahs.forEach(function(a){ if(chosen.has(a.sura)) set.add(a.sura + "-" + a.aya); });
+    }else if(activeTab === "juz"){
+      const chosen = new Set(Array.from(document.querySelectorAll(".juz-cb:checked")).map(function(cb){ return parseInt(cb.value, 10); }));
+      ayahs.forEach(function(a){ if(chosen.has(a.juz)) set.add(a.sura + "-" + a.aya); });
+    }else{
+      const pages = parsePageRanges(document.getElementById("page-ranges").value);
+      ayahs.forEach(function(a){
+        if(pages === null || pages.has(a.page)) set.add(a.sura + "-" + a.aya);
+      });
+    }
+    return set;
+  }
+
+  // ---------- Phrase index building ----------
+  function buildPhraseIndex(minWords, maxWords){
+    const index = new Map(); // phrase -> occurrences[] (every occurrence, not deduped per surah)
+    for(let ai = 0; ai < ayahs.length; ai++){
+      const a = ayahs[ai];
+      const tokens = a.tokens;
+      const n = tokens.length;
+      for(let len = minWords; len <= maxWords; len++){
+        if(len > n) break;
+        for(let i = 0; i + len <= n; i++){
+          const key = tokens.slice(i, i + len).join(" ");
+          let occs = index.get(key);
+          if(!occs){
+            occs = [];
+            index.set(key, occs);
+          }
+          occs.push({ sura: a.sura, ayah: a.aya, page: a.page, juz: a.juz, tokens: tokens, startTok: i, endTok: i + len - 1 });
+        }
+      }
+    }
+    return index;
+  }
+
+  function unitOf(occurrence, groupBy){
+    return groupBy === "juz" ? occurrence.juz : occurrence.sura;
+  }
+
+  function buildPool(index, minUnits, maxUnits, portionSet, groupBy){
+    const result = [];
+    index.forEach(function(occurrences, phrase){
+      let allInPortion = true;
+      for(let i = 0; i < occurrences.length; i++){
+        const o = occurrences[i];
+        if(!portionSet.has(o.sura + "-" + o.ayah)){ allInPortion = false; break; }
+      }
+      if(!allInPortion) return;
+
+      const unitSet = new Set(occurrences.map(function(o){ return unitOf(o, groupBy); }));
+      if(unitSet.size < minUnits || unitSet.size > maxUnits) return;
+
+      result.push({ phrase: phrase, occurrences: occurrences });
+    });
+    return result;
+  }
+
+  // Drops phrases that are just an overlapping sub-window of a longer phrase matching the
+  // exact same units (e.g. "BCD" inside "ABCDE") — keeping only the longest ("maximal") match
+  // per overlapping cluster. Works by grouping candidates by their unit-set (surahs or juz,
+  // depending on groupBy), then within each group keeping a candidate only if every one of its
+  // occurrences physically overlaps (same surah, same ayah, overlapping word range) with some
+  // occurrence of a longer candidate already kept. Unlike a simple neighbour-word check, this
+  // also correctly handles runs longer than maxWords, where several equal-length windows would
+  // otherwise all slide across the same span without ever being compared to each other, and it
+  // generalises cleanly now that a phrase can have multiple occurrences within the same unit.
+  function dedupOverlappingPhrases(flatPool, groupBy){
+    const byUnitSet = new Map();
+    flatPool.forEach(function(entry){
+      const unitList = Array.from(new Set(entry.occurrences.map(function(o){ return unitOf(o, groupBy); }))).sort(function(a, b){ return a - b; });
+      const key = unitList.join(",");
+      if(!byUnitSet.has(key)) byUnitSet.set(key, []);
+      byUnitSet.get(key).push(entry);
+    });
+
+    const kept = [];
+    byUnitSet.forEach(function(group){
+      group.sort(function(a, b){
+        const la = a.phrase.split(" ").length, lb = b.phrase.split(" ").length;
+        if(lb !== la) return lb - la; // longer first
+        const minA = Math.min.apply(null, a.occurrences.map(function(o){ return o.startTok; }));
+        const minB = Math.min.apply(null, b.occurrences.map(function(o){ return o.startTok; }));
+        return minA - minB; // earlier position first, as a tiebreak
+      });
+
+      const survivors = [];
+      group.forEach(function(candidate){
+        const overlapsSurvivor = survivors.some(function(kept){
+          return candidate.occurrences.every(function(co){
+            return kept.occurrences.some(function(ko){
+              if(ko.sura !== co.sura || ko.ayah !== co.ayah) return false; // different verse: not the same physical span
+              return !(co.endTok < ko.startTok || co.startTok > ko.endTok); // ranges overlap
+            });
+          });
+        });
+        if(!overlapsSurvivor) survivors.push(candidate);
+      });
+      survivors.forEach(function(s){ kept.push(s); });
+    });
+
+    return kept;
+  }
+
+  // Groups phrases that occur in the exact same set of units (surahs or juz), since such
+  // phrases can't be told apart from the question alone (Option A: reveal all of them together).
+  function groupByUnitSet(flatPool, groupBy){
+    const groups = new Map(); // key (sorted unit list joined) -> {unitList, phrases}
+    flatPool.forEach(function(entry){
+      const unitList = Array.from(new Set(entry.occurrences.map(function(o){ return unitOf(o, groupBy); }))).sort(function(a, b){ return a - b; });
+      const key = unitList.join(",");
+      let group = groups.get(key);
+      if(!group){
+        group = { unitList: unitList, phrases: [] };
+        groups.set(key, group);
+      }
+      group.phrases.push(entry);
+    });
+    return Array.from(groups.values());
+  }
+
+  // ---------- Rendering helpers ----------
+  function renderTokensWithHighlight(tokens, startTok, endTok){
+    const before = tokens.slice(0, startTok).map(escapeHTML).join(" ");
+    const phrase = tokens.slice(startTok, endTok + 1).map(escapeHTML).join(" ");
+    const after = tokens.slice(endTok + 1).map(escapeHTML).join(" ");
+    let html = "<mark>" + phrase + "</mark>";
+    if(before) html = before + " " + html;
+    if(after) html = html + " " + after;
+    return html;
+  }
+
+  function escapeHTML(s){
+    const div = document.createElement("div");
+    div.textContent = s;
+    return div.innerHTML;
+  }
+
+  function suraName(idx){
+    const s = suraMeta.get(idx);
+    return s ? s.name : ("Surah " + idx);
+  }
+
+  function unitLabel(unit, groupBy){
+    return groupBy === "juz" ? ("Juz " + unit) : suraName(unit);
+  }
+
+  function getGroupByMode(){
+    const btn = document.querySelector("#group-by-toggle .segment-btn.active");
+    return btn ? btn.dataset.groupby : "sura";
+  }
+
+  // ---------- Quiz flow ----------
+  function showQuestion(){
+    const group = pool[Math.floor(Math.random() * pool.length)];
+    currentQuestion = group;
+    const groupBy = getGroupByMode();
+
+    const names = group.unitList.map(function(u){ return unitLabel(u, groupBy); });
+    const namesEl = document.getElementById("quiz-surah-names");
+    namesEl.classList.toggle("ltr-mode", groupBy === "juz");
+    namesEl.textContent = names.join(groupBy === "juz" ? ", " : "، ");
+
+    document.getElementById("quiz-count-meta").textContent =
+      group.unitList.length + (groupBy === "juz" ? " juz" : " surahs");
+
+    const similarEl = document.getElementById("quiz-similar-meta");
+    if(group.phrases.length > 1){
+      similarEl.textContent = group.phrases.length + " Similar Phrases";
+      similarEl.hidden = false;
+    }else{
+      similarEl.hidden = true;
+    }
+
+    document.getElementById("quiz-answer").hidden = true;
+    document.getElementById("quiz-question").hidden = false;
+    document.getElementById("reveal-answer").hidden = false;
+    document.getElementById("new-question").hidden = true;
+    document.getElementById("new-question-top").hidden = true;
+  }
+
+  function occurrenceHTML(o){
+    return '<div class="occurrence">' +
+        '<div class="occurrence-meta">' +
+          '<span class="surah-name" dir="rtl">' + escapeHTML(suraName(o.sura)) + '</span>' +
+          '<span>Ayah ' + o.ayah + '</span>' +
+          '<span>Page ' + o.page + '</span>' +
+        '</div>' +
+        '<div class="ayah-text" dir="rtl">' + renderTokensWithHighlight(o.tokens, o.startTok, o.endTok) + '</div>' +
+      '</div>';
+  }
+
+  function revealAnswer(){
+    if(!currentQuestion) return;
+    const groupBy = getGroupByMode();
+
+    const container = document.getElementById("answer-occurrences");
+    container.innerHTML = "";
+
+    const multiple = currentQuestion.phrases.length > 1;
+    currentQuestion.phrases.forEach(function(phraseEntry, idx){
+      const block = document.createElement("div");
+      block.className = "phrase-block";
+
+      let html = "";
+      if(multiple){
+        html += '<p class="phrase-label">Phrase ' + (idx + 1) + ' of ' + currentQuestion.phrases.length + '</p>';
+      }
+      html += '<div class="answer-phrase">' + escapeHTML(phraseEntry.phrase) + '</div>';
+
+      if(groupBy === "juz"){
+        const byJuz = new Map();
+        phraseEntry.occurrences.forEach(function(o){
+          if(!byJuz.has(o.juz)) byJuz.set(o.juz, []);
+          byJuz.get(o.juz).push(o);
+        });
+        const juzKeys = Array.from(byJuz.keys()).sort(function(a, b){ return a - b; });
+        juzKeys.forEach(function(j){
+          html += '<p class="unit-heading"><span>Juz ' + j + '</span></p>';
+          const occs = byJuz.get(j).slice().sort(function(a, b){ return a.sura - b.sura || a.ayah - b.ayah; });
+          occs.forEach(function(o){ html += occurrenceHTML(o); });
+        });
+      }else{
+        const sorted = phraseEntry.occurrences.slice().sort(function(a, b){ return a.sura - b.sura || a.ayah - b.ayah; });
+        sorted.forEach(function(o){ html += occurrenceHTML(o); });
+      }
+
+      block.innerHTML = html;
+      container.appendChild(block);
+    });
+
+    document.getElementById("quiz-answer").hidden = false;
+    document.getElementById("reveal-answer").hidden = true;
+    document.getElementById("new-question").hidden = false;
+    document.getElementById("new-question-top").hidden = false;
+  }
+
+  // ---------- Field-level validation helpers ----------
+  const INT_RE = /^\d+$/;
+
+  function clearFieldErrors(){
+    ["words-error", "surahs-error", "similar-error", "page-error"].forEach(function(id){
+      document.getElementById(id).textContent = "";
+    });
+  }
+
+  function setSettingsStatus(msg, isError){
+    stopSettingsLoadingAnim();
+    const el = document.getElementById("settings-status");
+    el.textContent = msg;
+    el.classList.toggle("error", !!isError);
+  }
+
+  // Validates a min/max pair of integer inputs. Returns {min,max} or null (and writes to errEl) on failure.
+  function validateIntRange(minEl, maxEl, errEl, floor, floorLabel){
+    const minRaw = minEl.value.trim();
+    const maxRaw = maxEl.value.trim();
+    if(!INT_RE.test(minRaw) || !INT_RE.test(maxRaw)){
+      errEl.textContent = "Enter whole numbers only (no decimals).";
+      return null;
+    }
+    const min = parseInt(minRaw, 10);
+    const max = parseInt(maxRaw, 10);
+    if(min < floor){
+      errEl.textContent = "Minimum must be at least " + floorLabel + ".";
+      return null;
+    }
+    if(max < min){
+      errEl.textContent = "Maximum must be greater than or equal to minimum.";
+      return null;
+    }
+    return { min: min, max: max };
+  }
+
+  // ---------- Apply settings ----------
+  async function applySettings(){
+    clearFieldErrors();
+    setSettingsStatus("", false);
+
+    const wordRange = validateIntRange(
+      document.getElementById("min-words"),
+      document.getElementById("max-words"),
+      document.getElementById("words-error"),
+      1, "1"
+    );
+    const surahRange = validateIntRange(
+      document.getElementById("min-surahs"),
+      document.getElementById("max-surahs"),
+      document.getElementById("surahs-error"),
+      2, "2"
+    );
+    const similarRange = validateIntRange(
+      document.getElementById("min-similar"),
+      document.getElementById("max-similar"),
+      document.getElementById("similar-error"),
+      1, "1"
+    );
+
+    let portionSet = null;
+    try{
+      portionSet = buildPortionSet();
+    }catch(err){
+      document.getElementById("page-error").textContent = err.message;
+    }
+
+    if(!wordRange || !surahRange || !similarRange || !portionSet){
+      return;
+    }
+    if(portionSet.size === 0){
+      setSettingsStatus("The selected portion is empty. Select at least one surah, juz, or valid page range.", true);
+      return;
+    }
+
+    const applyBtn = document.getElementById("apply-settings");
+    applyBtn.disabled = true;
+    setSettingsStatusLoading("Building phrase index");
+
+    // Yield a frame so the status message paints before the heavy loop runs.
+    await new Promise(function(r){ requestAnimationFrame(function(){ requestAnimationFrame(r); }); });
+
+    try{
+      if(phraseIndex === null || indexedMinWords !== wordRange.min || indexedMaxWords !== wordRange.max){
+        phraseIndex = buildPhraseIndex(wordRange.min, wordRange.max);
+        indexedMinWords = wordRange.min;
+        indexedMaxWords = wordRange.max;
+      }
+      const groupBy = getGroupByMode();
+      const flatPool = buildPool(phraseIndex, surahRange.min, surahRange.max, portionSet, groupBy);
+      const maximalPool = dedupOverlappingPhrases(flatPool, groupBy);
+      pool = groupByUnitSet(maximalPool, groupBy).filter(function(group){
+        return group.phrases.length >= similarRange.min && group.phrases.length <= similarRange.max;
+      });
+    }catch(err){
+      setSettingsStatus("Something went wrong while building the index: " + err.message, true);
+      applyBtn.disabled = false;
+      return;
+    }
+
+    applyBtn.disabled = false;
+
+    if(pool.length === 0){
+      setSettingsStatus("No matching phrases were found with these settings.", true);
+      return;
+    }
+
+    setSettingsStatus("", false);
+    settingsPanel.hidden = true;
+    quizPanel.hidden = false;
+    topActions.hidden = false;
+    showQuestion();
+  }
+
+  // ---------- Wire up buttons ----------
+  document.getElementById("apply-settings").addEventListener("click", applySettings);
+  document.getElementById("reveal-answer").addEventListener("click", revealAnswer);
+  document.getElementById("new-question").addEventListener("click", showQuestion);
+  document.getElementById("new-question-top").addEventListener("click", showQuestion);
+  document.getElementById("change-settings").addEventListener("click", function(){
+    quizPanel.hidden = true;
+    settingsPanel.hidden = false;
+    topActions.hidden = true;
+    setSettingsStatus("", false);
+  });
+
+  // ---------- Start ----------
+  setStatusLoading("Loading Qur'an data");
+  loadData().catch(function(){ /* status already set by loadData */ });
+
+})();
+</script>
+</body>
+</html>
