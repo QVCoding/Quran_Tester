@@ -16,10 +16,14 @@ Run `make_quran_words.py`, then convert the resulting file to csv.
 
  `Minimum_Phrase_Tester.html` App which shows a unique-phrase (with no more words than necessary for the phrase to be uniquely identifiable) for the user to identify.
 
- `Occurrences_Tester.html` App which tests the user in identifying the recurrences of phrases in the Quran.
+ `commonphrase.html` App which shows a set of surahs of juz's which all contain a common phrase, and the user must identify that phrase.
+
+ `quran-simple-plain_nobasmalah.sql` Sql of entire Quran with the basmalah from the beginning of the surahs removed (except Fatihah). The basmalahs are removed to prevent them from being identified as a common phrase in every surah.
+
+ `Occurrences_Tester.html` App which tests the user in identifying whether certain phrases appear in certain Surahs/Juz's of the Quran.
 
  `khatmahclock.html` App which has a countdown for Quran Khatmas - showing what page the reciter must be up to to finish on time.
  Potential updates: Use ayah timing data from qul.ai to show the exact ayah to keep pace.
 
 ---
-The code itself is primarily AI-written, but AI did not generate any of the actual Quranic text. The text on the page (description, labels, tooltips, instructions etc.) is all human-written.
+The code itself is primarily AI-written, but AI did not generate any of the actual Quranic text. The text on the page (description, labels, tooltips, instructions etc.) is human-written.
