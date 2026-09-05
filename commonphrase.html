@@ -32,7 +32,14 @@
   }
   #app{max-width:700px;margin:0 auto;}
   header{margin-bottom:2rem;border-bottom:1px solid var(--border);padding-bottom:1.25rem;}
-  #top-actions{display:flex;justify-content:center;align-items:center;gap:0.75rem;flex-wrap:wrap;margin-bottom:2rem;}
+  #top-actions{display:flex;flex-direction:column;align-items:center;gap:0.6rem;margin-bottom:2rem;}
+  .top-actions-buttons{display:flex;justify-content:center;align-items:center;gap:0.75rem;flex-wrap:wrap;}
+  header p + p{margin-top:0.5rem;}
+  .link-btn{
+    background:none;border:none;padding:0;margin:0;
+    font:inherit;color:var(--accent);text-decoration:underline;cursor:pointer;
+  }
+  .link-btn:hover{color:var(--text);}
   h1{
     font-family:"Spectral",Georgia,serif;
     font-weight:600;
@@ -290,11 +297,15 @@
   <header>
     <h1>Common Phrase Finder</h1>
     <p>Finds phrases repeated word-for-word across different surahs. Page numbers are based on old Madinah Mushaf.</p>
+    <p>This site remembers which questions you've seen to prevent repeats — <button type="button" class="link-btn" id="reset-seen-btn">reset it here</button>.</p>
   </header>
 
   <div id="top-actions" hidden>
-    <button type="button" class="btn" id="change-settings">Change settings</button>
-    <button type="button" class="btn btn-primary" id="new-question-top" hidden>New question</button>
+    <p class="quiz-meta" id="pool-count-info"></p>
+    <div class="top-actions-buttons">
+      <button type="button" class="btn" id="change-settings">Change settings</button>
+      <button type="button" class="btn btn-primary" id="new-question-top" hidden>New question</button>
+    </div>
   </div>
 
   <div id="status" class="status">Loading Qur'an data</div>
@@ -426,6 +437,63 @@
   let pool = [];            // [{unitList:[...], phrases:[{phrase, occurrences:[...]}]}]
   let currentQuestion = null;
   let moreSettingsOpen = false;
+
+  // ---------- Seen-question persistence (avoids repeats, survives reloads) ----------
+  const SEEN_STORAGE_KEY = "commonPhraseFinder:seenQuestions";
+  let seenSet = loadSeenSet();
+  let questionQueue = []; // shuffled indices into `pool`, not-yet-seen first
+  let lastShownIndex = -1;
+
+  function loadSeenSet(){
+    try{
+      const raw = localStorage.getItem(SEEN_STORAGE_KEY);
+      if(!raw) return new Set();
+      const arr = JSON.parse(raw);
+      if(Array.isArray(arr)) return new Set(arr);
+    }catch(err){
+      console.warn("Could not load seen-question history:", err);
+    }
+    return new Set();
+  }
+
+  function saveSeenSet(){
+    try{
+      localStorage.setItem(SEEN_STORAGE_KEY, JSON.stringify(Array.from(seenSet)));
+    }catch(err){
+      console.warn("Could not save seen-question history:", err);
+    }
+  }
+
+  // A stable identity for a question group, independent of array order, so it survives
+  // across sessions and re-searches as long as the underlying phrase/unit combo matches.
+  function groupKeyFor(group, groupBy){
+    const phrasesSorted = group.phrases.map(function(p){ return p.phrase; }).sort().join("\u2016");
+    return groupBy + "|" + group.unitList.join(",") + "|" + phrasesSorted;
+  }
+
+  function shuffleArray(arr){
+    for(let i = arr.length - 1; i > 0; i--){
+      const j = Math.floor(Math.random() * (i + 1));
+      const tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
+    }
+    return arr;
+  }
+
+  // Builds a shuffled queue of pool indices that haven't been marked as seen yet.
+  function buildRemainingQueue(groupBy){
+    const indices = [];
+    pool.forEach(function(group, i){
+      if(!seenSet.has(groupKeyFor(group, groupBy))) indices.push(i);
+    });
+    return shuffleArray(indices);
+  }
+
+  function updatePoolCountDisplay(){
+    const el = document.getElementById("pool-count-info");
+    if(!el) return;
+    const total = pool.length;
+    el.textContent = total + " question" + (total === 1 ? "" : "s") + ", " + questionQueue.length + " new";
+  }
 
   // ---------- DOM refs ----------
   const statusEl = document.getElementById("status");
@@ -891,9 +959,31 @@
 
   // ---------- Quiz flow ----------
   function showQuestion(){
-    const group = pool[Math.floor(Math.random() * pool.length)];
-    currentQuestion = group;
     const groupBy = getGroupByMode();
+
+    if(questionQueue.length === 0){
+      // Every question has already been seen at some point — reshuffle the whole pool so
+      // play can continue (repeats are now unavoidable), avoiding an immediate repeat of
+      // whatever was just shown.
+      const indices = shuffleArray(pool.map(function(_, i){ return i; }));
+      if(indices.length > 1 && indices[0] === lastShownIndex){
+        const swapWith = 1 + Math.floor(Math.random() * (indices.length - 1));
+        const tmp = indices[0]; indices[0] = indices[swapWith]; indices[swapWith] = tmp;
+      }
+      questionQueue = indices;
+    }
+
+    const idx = questionQueue.shift();
+    lastShownIndex = idx;
+    const group = pool[idx];
+    currentQuestion = group;
+
+    const key = groupKeyFor(group, groupBy);
+    if(!seenSet.has(key)){
+      seenSet.add(key);
+      saveSeenSet();
+    }
+    updatePoolCountDisplay();
 
     const names = group.unitList.map(function(u){ return unitLabel(u, groupBy); });
     const namesEl = document.getElementById("quiz-surah-names");
@@ -1082,6 +1172,9 @@
       return;
     }
 
+    questionQueue = buildRemainingQueue(getGroupByMode());
+    lastShownIndex = -1;
+
     setSettingsStatus("", false);
     settingsPanel.hidden = true;
     quizPanel.hidden = false;
@@ -1099,6 +1192,16 @@
     settingsPanel.hidden = false;
     topActions.hidden = true;
     setSettingsStatus("", false);
+  });
+  document.getElementById("reset-seen-btn").addEventListener("click", function(){
+    if(!window.confirm("Reset questions?")) return;
+    seenSet = new Set();
+    try{ localStorage.removeItem(SEEN_STORAGE_KEY); }catch(err){ console.warn("Could not clear seen-question history:", err); }
+    if(pool.length > 0){
+      questionQueue = buildRemainingQueue(getGroupByMode());
+      lastShownIndex = -1;
+      updatePoolCountDisplay();
+    }
   });
 
   // ---------- Start ----------
