@@ -143,8 +143,11 @@
   .btn-primary{background:var(--accent);color:#1a1408;border-color:var(--accent);font-weight:600;}
   .btn-primary:hover{filter:brightness(1.08);}
   .btn:disabled{opacity:0.5;cursor:not-allowed;}
-  .btn-row{display:flex;gap:0.75rem;flex-wrap:wrap;margin-top:1.5rem;}
+  .btn-row{display:flex;gap:0.75rem;flex-wrap:wrap;align-items:center;margin-top:1.5rem;}
   #quiz-panel .btn-row{justify-content:center;}
+  .loading-note{font-size:0.88rem;color:var(--text-muted);}
+  .loading-dots{display:inline-block;width:1.1em;text-align:left;}
+  .list-loading{grid-column:1 / -1;text-align:center;padding:1.25rem 0;color:var(--text-muted);font-size:0.9rem;}
 
   .more-settings-toggle{
     display:flex;align-items:center;gap:0.4rem;
@@ -308,9 +311,9 @@
     </div>
   </div>
 
-  <div id="status" class="status">Loading Qur'an data</div>
+  <div id="status" class="status hidden"></div>
 
-  <section id="settings-panel" class="panel" hidden>
+  <section id="settings-panel" class="panel">
     <h2>Settings</h2>
 
     <div class="field">
@@ -335,7 +338,7 @@
           <input type="checkbox" id="surah-select-all" checked>
           <label for="surah-select-all">Select all surahs</label>
         </div>
-        <div class="checkbox-list" id="surah-list"></div>
+        <div class="checkbox-list" id="surah-list"><div class="list-loading">Loading Qur'an data<span class="loading-dots">.</span></div></div>
       </div>
 
       <div class="tab-panel" id="tab-juz">
@@ -343,7 +346,7 @@
           <input type="checkbox" id="juz-select-all" checked>
           <label for="juz-select-all">Select all juz</label>
         </div>
-        <div class="checkbox-list" id="juz-list"></div>
+        <div class="checkbox-list" id="juz-list"><div class="list-loading">Loading Qur'an data<span class="loading-dots">.</span></div></div>
       </div>
 
       <div class="tab-panel" id="tab-page">
@@ -392,9 +395,11 @@
 
     <p class="settings-status" id="settings-status"></p>
     <div class="btn-row">
-      <button type="button" class="btn btn-primary" id="apply-settings">Begin Test</button>
+      <button type="button" class="btn btn-primary" id="apply-settings" disabled>Begin Test</button>
+      <span class="loading-note" id="begin-test-loading">Loading Qur'an data<span class="loading-dots">.</span></span>
     </div>
   </section>
+
 
   <section id="quiz-panel" hidden>
     <div class="quiz-card">
@@ -546,8 +551,30 @@
     if(settingsLoadingStop){ settingsLoadingStop(); settingsLoadingStop = null; }
   }
 
+  // Background data loading: the settings screen is visible and usable immediately;
+  // this just animates the trailing dots on every "Loading Qur'an data…" placeholder
+  // (surah/juz lists, Begin Test note) at once, so nothing looks frozen while the
+  // Qur'an text loads in the background.
+  let dataReady = false;
+  let bgLoadingInterval = null;
+  let bgLoadingDotsCount = 0;
+  function tickBgLoadingDots(){
+    bgLoadingDotsCount = (bgLoadingDotsCount % 3) + 1;
+    const dots = ".".repeat(bgLoadingDotsCount);
+    document.querySelectorAll(".loading-dots").forEach(function(el){ el.textContent = dots; });
+  }
+  function startBgLoadingAnimation(){
+    if(bgLoadingInterval) return;
+    tickBgLoadingDots();
+    bgLoadingInterval = setInterval(tickBgLoadingDots, 500);
+  }
+  function stopBgLoadingAnimation(){
+    if(bgLoadingInterval){ clearInterval(bgLoadingInterval); bgLoadingInterval = null; }
+  }
+
   // ---------- Load & parse ----------
   async function loadData(){
+    startBgLoadingAnimation();
     let sqlText, xmlText;
     try{
       const [sqlResp, xmlResp] = await Promise.all([fetch(SQL_URL), fetch(XML_URL)]);
@@ -561,7 +588,11 @@
       buildAyahRecords(sqlRows, meta);
     }catch(err){
       console.error("Failed to load/parse Qur'an data:", err);
+      stopBgLoadingAnimation();
       setStatus("Couldn't load Qur'an data. Please try refreshing the page.", true);
+      document.getElementById("surah-list").innerHTML = '<div class="list-loading">Data unavailable.</div>';
+      document.getElementById("juz-list").innerHTML = '<div class="list-loading">Data unavailable.</div>';
+      document.getElementById("begin-test-loading").textContent = "Data unavailable.";
       throw err;
     }
   }
@@ -710,8 +741,12 @@
     syncMoreSettingsUI();
     updateUnitCountLabels();
 
+    dataReady = true;
+    stopBgLoadingAnimation();
+    document.getElementById("apply-settings").disabled = false;
+    document.getElementById("begin-test-loading").hidden = true;
+
     hideStatus();
-    settingsPanel.hidden = false;
   }
 
   function wireSelectAll(allId, itemClass){
@@ -797,6 +832,22 @@
     }
     return pages;
   }
+
+  // Live validation: clear the error the moment the person edits the field again (rather
+  // than leaving a stale error up while they're mid-correction), and validate as soon as
+  // they leave the field, so mistakes surface immediately rather than only at Begin Test.
+  document.getElementById("page-ranges").addEventListener("input", function(){
+    document.getElementById("page-error").textContent = "";
+  });
+  document.getElementById("page-ranges").addEventListener("blur", function(){
+    if(!dataReady) return; // pageCount isn't known yet — nothing meaningful to validate
+    try{
+      parsePageRanges(this.value);
+      document.getElementById("page-error").textContent = "";
+    }catch(err){
+      document.getElementById("page-error").textContent = err.message;
+    }
+  });
 
   // ---------- Build portion set (keys are "sura-aya") ----------
   function buildPortionSet(){
@@ -1205,7 +1256,6 @@
   });
 
   // ---------- Start ----------
-  setStatusLoading("Loading Qur'an data");
   loadData().catch(function(){ /* status already set by loadData */ });
 
 })();
