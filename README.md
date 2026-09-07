@@ -22,6 +22,8 @@ Run `make_quran_words.py`, then convert the resulting file to csv.
 
  `Occurrences_Tester.html` App which tests the user in identifying whether certain phrases appear in certain Surahs/Juz's of the Quran.
 
+ `changecolour.py` Changes the colour of the Quran page pngs to give them contrast on whatever background the app has.
+
  `khatmahclock.html` App which has a countdown for Quran Khatmas - showing what page the reciter must be up to to finish on time.
  Potential updates: Use ayah timing data from qul.ai to show the exact ayah to keep pace.
 
