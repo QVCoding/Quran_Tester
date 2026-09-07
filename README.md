@@ -14,7 +14,7 @@ How to reproduce:
 From [https://tanzil.net/download/](https://tanzil.net/download/) download the `Simple (Plain)` SQL text, with all options disabled.
 Run `make_quran_words.py`, then convert the resulting file to csv.
 
- `Minimum_Phrase_Tester.html` App which shows a unique-phrase (with no more words than necessary for the phrase to be uniquely identifiable) for the user to identify.
+ `minimaltest.html` App which shows a unique-phrase (with no more words than necessary for the phrase to be uniquely identifiable) for the user to identify.
 
  `commonphrase.html` App which shows a set of surahs of juz's which all contain a common phrase, and the user must identify that phrase.
 
