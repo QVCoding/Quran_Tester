@@ -886,6 +886,96 @@
         }
 
         // =====================================================================
+        // Saved settings (persisted in localStorage)
+        // =====================================================================
+
+        const SETTINGS_STORAGE_KEY = 'quranTesterSettings';
+
+        function saveSettings() {
+            try {
+                const settings = {
+                    portionType: document.querySelector('input[name="portion-type"]:checked').value,
+                    activeTab: document.querySelector('.tab-btn.active').dataset.tab,
+                    selectedSurahs: Array.from(document.querySelectorAll('.surah-cb:checked')).map(cb => cb.value),
+                    selectedJuzs: Array.from(document.querySelectorAll('.juz-cb:checked')).map(cb => cb.value),
+                    pageRange: document.getElementById('page-range').value,
+                    uniqueInQuran: document.getElementById('unique-in-quran').checked,
+                    singleVerseOnly: document.getElementById('single-verse-only').checked,
+                    startOfAyah: document.getElementById('start-of-ayah').checked,
+                    showAyahMarker: document.getElementById('show-ayah-marker').checked,
+                    showPageImage: document.getElementById('show-page-image').checked,
+                    restrictLength: document.getElementById('restrict-length').checked,
+                    minLength: document.getElementById('min-length').value,
+                    maxLength: document.getElementById('max-length').value
+                };
+                localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+            } catch (e) {
+                console.warn('Could not save settings to localStorage.', e);
+            }
+        }
+
+        function loadSavedSettings() {
+            try {
+                const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
+                return raw ? JSON.parse(raw) : null;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        // Applies saved settings to whichever relevant elements currently exist in the DOM.
+        // Called once early (covers everything except the surah/juz lists, which don't
+        // exist yet) and again once those lists are populated.
+        function applySavedSettings(settings) {
+            if (!settings) return;
+
+            if (settings.portionType) {
+                document.querySelectorAll('input[name="portion-type"]').forEach(r => {
+                    r.checked = (r.value === settings.portionType);
+                });
+                document.getElementById('filter-options').style.display = (settings.portionType === 'select') ? 'block' : 'none';
+            }
+
+            if (settings.activeTab) {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === settings.activeTab));
+                document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + settings.activeTab));
+            }
+
+            if (typeof settings.pageRange === 'string') document.getElementById('page-range').value = settings.pageRange;
+            if (typeof settings.uniqueInQuran === 'boolean') document.getElementById('unique-in-quran').checked = settings.uniqueInQuran;
+            if (typeof settings.singleVerseOnly === 'boolean') document.getElementById('single-verse-only').checked = settings.singleVerseOnly;
+            if (typeof settings.startOfAyah === 'boolean') document.getElementById('start-of-ayah').checked = settings.startOfAyah;
+            if (typeof settings.showAyahMarker === 'boolean') document.getElementById('show-ayah-marker').checked = settings.showAyahMarker;
+            if (typeof settings.showPageImage === 'boolean') document.getElementById('show-page-image').checked = settings.showPageImage;
+
+            if (typeof settings.restrictLength === 'boolean') {
+                document.getElementById('restrict-length').checked = settings.restrictLength;
+                document.getElementById('length-inputs').style.display = settings.restrictLength ? 'block' : 'none';
+            }
+            if (typeof settings.minLength === 'string') document.getElementById('min-length').value = settings.minLength;
+            if (typeof settings.maxLength === 'string') document.getElementById('max-length').value = settings.maxLength;
+
+            if (Array.isArray(settings.selectedSurahs)) {
+                const boxes = document.querySelectorAll('.surah-cb');
+                if (boxes.length > 0) {
+                    const wanted = new Set(settings.selectedSurahs);
+                    boxes.forEach(cb => { cb.checked = wanted.has(cb.value); });
+                    document.getElementById('surah-select-all').checked =
+                        (document.querySelectorAll('.surah-cb:checked').length === boxes.length);
+                }
+            }
+            if (Array.isArray(settings.selectedJuzs)) {
+                const boxes = document.querySelectorAll('.juz-cb');
+                if (boxes.length > 0) {
+                    const wanted = new Set(settings.selectedJuzs);
+                    boxes.forEach(cb => { cb.checked = wanted.has(cb.value); });
+                    document.getElementById('juz-select-all').checked =
+                        (document.querySelectorAll('.juz-cb:checked').length === boxes.length);
+                }
+            }
+        }
+
+        // =====================================================================
         // UI & event handling
         // =====================================================================
 
@@ -938,6 +1028,9 @@
                     document.querySelectorAll('.info-tooltip').forEach(t => t.classList.remove('show'));
                 }
             });
+
+            // Restore whatever was saved from a previous visit.
+            applySavedSettings(loadSavedSettings());
         }
 
         // Wires a "select all" checkbox to a group of checkboxes sharing itemClass, keeping
@@ -985,6 +1078,7 @@
                 await loadXML();
                 precomputeJuzAndPage();
                 populateSurahAndJuzLists();
+                applySavedSettings(loadSavedSettings());
 
                 dataReady = true;
                 stopLoadingAnimation();
@@ -1206,6 +1300,10 @@
 
             displayedWords = uniquePhrase.words.slice();
             displayPhrase();
+
+            // Only persist settings once a test has actually started with them, rather
+            // than on every tweak the user makes while still deciding.
+            saveSettings();
 
             // Hide controls once testing begins
             document.querySelector('.controls').style.display = 'none';
